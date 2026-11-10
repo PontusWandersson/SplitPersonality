@@ -1,0 +1,893 @@
+<title>Lagerspelet basspel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Unbounded:wght@500;700;800&display=swap">
+<style>
+/* Upplägg som C&T Maniac: brädet i en ram i mitten, LAYER-panelen till vänster, vinsterna till höger och knappraden under
+   (saldo, insats med − snurra +, autospel, turbo, vinst). TEST och info uppe till vänster, helskärm uppe till höger.
+   Telefon: LAYER-brickorna ovanför brädet, knappraden under. Ett eget mörkt tema (inte C&T:s), samma i båda lägena. */
+:root {
+  color-scheme: dark;
+  --bg: #0e1017;
+  --bg2: #151826;
+  --panel: #1b1f30;
+  --line: #2f3550;
+  --fg: #ede9de;
+  --muted: #979db6;
+  --gold: #ffd84d;
+  --gold-ink: #2b2100;
+  --l1: #43bfae;
+  --l2: #9a86f5;
+  --l3: #f2a65e;
+  --danger: #ff7d6e;
+  --f-display: "Unbounded", "Trebuchet MS", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% 38%, #1a1e30 0, transparent 62%), repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 44px), repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 44px);
+  color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.4; overflow: hidden;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+#game {
+  height: 100%; max-width: 1240px; margin: 0 auto;
+  padding-block: 10px 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px;
+}
+#top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
+.tl, .tr { display: flex; gap: 8px; align-items: center; }
+.tr { justify-content: flex-end; }
+.ibtn { height: 34px; min-width: 34px; padding: 0 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: .78rem; font-weight: 700; letter-spacing: .08em; display: grid; place-items: center; }
+.ibtn:hover { border-color: var(--muted); }
+.ibtn svg { width: 17px; height: 17px; }
+.logo { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.05rem, 2.6vw, 1.6rem); letter-spacing: .02em; text-align: center; line-height: 1; }
+.logo span { color: var(--gold); }
+.logo small { display: block; font-family: var(--f-body); font-weight: 600; font-size: .62rem; letter-spacing: .32em; color: var(--muted); margin-top: 4px; }
+
+#mid { display: grid; grid-template-columns: 200px minmax(0, 1fr) 220px; gap: 18px; align-items: center; min-height: 0; }
+#machine { min-width: 0; min-height: 0; height: 100%; display: grid; place-items: center; }
+#frame { position: relative; padding: 10px; border-radius: 24px; background: var(--panel); border: 2px solid var(--line); box-shadow: inset 0 0 0 5px var(--bg2), 0 18px 50px rgba(0,0,0,.45); }
+#board { display: block; border-radius: 14px; touch-action: manipulation; }
+
+/* LAYER-panelen (som C&T:s LAYERSPINS-panel) */
+#left { display: grid; gap: 10px; align-content: center; }
+.brand { font-family: var(--f-display); font-weight: 800; font-size: 1rem; letter-spacing: .06em; }
+.brand span { color: var(--muted); font-weight: 500; }
+.tags { display: grid; gap: 8px; }
+.tag { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 12px; font-family: var(--f-display); font-weight: 700; font-size: .82rem; letter-spacing: .04em; border: 2px solid; background: var(--bg2); transition: opacity .25s, transform .25s; opacity: .42; }
+.tag b { font-family: var(--f-body); font-weight: 700; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.tag.on { opacity: 1; }
+.tag.bump { animation: bump .45s ease-out; }
+@keyframes bump { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.tag.t1 { border-color: var(--l1); color: var(--l1); }
+.tag.t2 { border-color: var(--l2); color: var(--l2); }
+.tag.t3 { border-color: var(--l3); color: var(--l3); }
+.hint { font-size: .8rem; color: var(--muted); margin: 0; display: grid; gap: 4px; }
+
+/* vinsterna (som C&T:s pratbubbla) */
+#right { display: grid; gap: 8px; align-content: center; min-width: 0; }
+#right h2 { margin: 0; font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.chips { display: grid; gap: 6px; min-height: 40px; }
+.chip { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 7px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: .82rem; font-variant-numeric: tabular-nums; animation: chipin .3s ease-out both; }
+.chip svg { width: 22px; height: 22px; }
+.chip b { color: var(--gold); font-weight: 700; }
+.chip small { color: var(--muted); display: block; font-size: .74rem; }
+@keyframes chipin { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sum { font-size: .8rem; color: var(--muted); }
+
+/* knappraden (som C&T:s) */
+#bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; grid-template-areas: "saldo ctrl vinst"; }
+.money { display: grid; gap: 1px; font-variant-numeric: tabular-nums; }
+.money span { font-size: .66rem; letter-spacing: .16em; color: var(--muted); font-weight: 700; }
+.money b { font-family: var(--f-display); font-weight: 700; font-size: 1.02rem; }
+#saldoBox { grid-area: saldo; }
+#vinstBox { grid-area: vinst; text-align: right; }
+#vinstBox b { color: var(--gold); }
+#vinstBox b.count { animation: bump .35s ease-out; }
+.ctrl { grid-area: ctrl; display: flex; align-items: center; gap: 10px; }
+.betbox { display: grid; gap: 1px; text-align: right; min-width: 64px; font-variant-numeric: tabular-nums; }
+.betbox span { font-size: .66rem; letter-spacing: .16em; color: var(--muted); font-weight: 700; }
+.betbox b { font-weight: 700; }
+.rbtn { width: 40px; height: 40px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); display: grid; place-items: center; font-size: 1.25rem; font-weight: 700; }
+.rbtn:hover:not(:disabled) { border-color: var(--muted); }
+.rbtn:disabled { opacity: .4; cursor: default; }
+.rbtn.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.rbtn svg { width: 19px; height: 19px; }
+#spin { width: 74px; height: 74px; border-radius: 50%; border: 4px solid #fff3c0; background: var(--gold); color: var(--gold-ink); display: grid; place-items: center; box-shadow: 0 6px 22px rgba(255,216,77,.28); transition: transform .12s; }
+#spin:active { transform: scale(.94); }
+#spin svg { width: 34px; height: 34px; }
+#spin.stop { background: #ff6b5e; border-color: #ffd1cb; color: #3a0904; box-shadow: 0 6px 22px rgba(255,107,94,.3); }
+#autoBtn { position: relative; }
+#autoBtn em { position: absolute; top: -7px; right: -9px; font-style: normal; font-size: .66rem; font-weight: 800; background: var(--gold); color: var(--gold-ink); border-radius: 999px; padding: 1px 6px; }
+
+/* popover-menyer (TEST, autospel) och överlägg (info, storvinst) */
+.pop { position: absolute; z-index: 30; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: grid; gap: 6px; min-width: 220px; box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+.pop h3 { margin: 2px 4px 2px; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.pop button { text-align: left; padding: 8px 10px; border-radius: 9px; background: var(--bg2); border: 1px solid var(--line); font-size: .86rem; }
+.pop button:hover { border-color: var(--muted); }
+.pop .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pop .row button { text-align: center; font-weight: 700; }
+.pop dl { margin: 4px; display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.pop dt { color: var(--muted); } .pop dd { margin: 0; text-align: right; font-weight: 600; }
+.ov { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(6,7,12,.72); padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.card { position: relative; width: min(100%, 640px); max-height: 100%; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: grid; gap: 14px; }
+.card h2 { margin: 0; font-family: var(--f-display); font-size: 1.25rem; text-wrap: balance; }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: .92rem; }
+.card .x { position: absolute; top: 12px; right: 12px; }
+.paywrap { overflow-x: auto; }
+.pay { border-collapse: collapse; width: 100%; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.pay th, .pay td { padding: 5px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pay th:first-child, .pay td:first-child { text-align: left; }
+.pay th { color: var(--muted); font-weight: 600; }
+.pay svg { width: 16px; height: 16px; vertical-align: -3px; margin-right: 5px; }
+.big { text-align: center; display: grid; gap: 8px; justify-items: center; cursor: pointer; user-select: none; }
+.big .tier { font-family: var(--f-display); font-weight: 800; font-size: clamp(2rem, 8vw, 3.8rem); color: var(--gold); letter-spacing: .02em; text-shadow: 0 4px 0 #6b4a00, 0 0 40px rgba(255,216,77,.35); animation: tierIn .5s cubic-bezier(.3,1.5,.5,1) both; }
+.big .amt { font-family: var(--f-display); font-weight: 700; font-size: clamp(1.6rem, 6vw, 2.8rem); font-variant-numeric: tabular-nums; }
+.big .xx { color: var(--muted); font-weight: 600; }
+.big .tap { font-size: .8rem; color: var(--muted); margin-top: 8px; }
+@keyframes tierIn { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 35; background: #2a1414; border: 1px solid var(--danger); color: #ffd5cf; border-radius: 12px; padding: 10px 14px; font-size: .88rem; max-width: calc(100% - 32px); }
+
+/* telefon och smala fönster */
+@media (max-width: 900px), (orientation: portrait) {
+  #mid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  #left { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  #left .brand, #left .hint { display: none; }
+  .tags { display: flex; gap: 6px; }
+  .tag { padding: 5px 9px; font-size: .68rem; border-radius: 10px; }
+  .tag b { font-size: .74rem; }
+  #right { display: none; }
+  #frame { padding: 6px; border-radius: 18px; }
+  #bar { grid-template-columns: 1fr 1fr; grid-template-areas: "saldo vinst" "ctrl ctrl"; row-gap: 6px; }
+  .ctrl { justify-content: center; }
+}
+@media (max-width: 380px) { .ctrl { gap: 6px; } .rbtn { width: 36px; height: 36px; } #spin { width: 66px; height: 66px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="s0" viewBox="0 0 40 40"><path d="M20 3L24.6 14.3L36.2 14.7L27.3 22.4L30.5 33.7L20 27.2L9.5 33.7L12.7 22.4L3.8 14.7L15.4 14.3Z" fill="#f5c451" stroke="#9c700c" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="s1" viewBox="0 0 40 40"><path d="M20 3L35.5 20L20 37L4.5 20Z" fill="#ff6f91" stroke="#a02c4c" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="s2" viewBox="0 0 40 40"><path d="M20 4L36.5 34.5L3.5 34.5Z" fill="#a78bfa" stroke="#563bbd" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="s3" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15.5" fill="#58c4f5" stroke="#1d6c96" stroke-width="2"/></symbol>
+    <symbol id="s4" viewBox="0 0 40 40"><rect x="6" y="6" width="28" height="28" rx="5" fill="#78dcb0" stroke="#24835a" stroke-width="2"/></symbol>
+    <symbol id="s5" viewBox="0 0 40 40"><path d="M20 4L34 12L34 28L20 36L6 28L6 12Z" fill="#ffa35a" stroke="#9d5512" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="s6" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="none" stroke="#c9cde6" stroke-width="7"/></symbol>
+    <symbol id="s7" viewBox="0 0 40 40"><path d="M15 5H25V15H35V25H25V35H15V25H5V15H15Z" fill="#e8e2cf" stroke="#857d66" stroke-width="2" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="game">
+  <div id="top">
+    <div class="tl">
+      <button class="ibtn" id="btnTest" aria-haspopup="true">TEST</button>
+      <button class="ibtn" id="btnInfo" aria-label="Regler och vinsttabell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.2v.1"/></svg></button>
+    </div>
+    <div class="logo">LAGER<span>SPELET</span><small>PROTOTYP · BASSPEL</small></div>
+    <div class="tr">
+      <button class="ibtn" id="btnFull" aria-label="Helskärm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </div>
+
+  <div id="mid">
+    <aside id="left" aria-label="Lagren">
+      <div class="brand">LAYERS <span>· nivåer</span></div>
+      <div class="tags">
+        <div class="tag t1" id="tag1">LAYER 1 <b id="n1">0</b></div>
+        <div class="tag t2" id="tag2">LAYER 2 <b id="n2">0</b></div>
+        <div class="tag t3" id="tag3">LAYER 3 <b id="n3">0</b></div>
+      </div>
+      <p class="hint"><span>En ruta som vinner levlar och får ett lager bakom symbolen.</span><span>Lagren syns i hörnen och räknas med i vinsterna.</span><span>LAYER 3 som vinner igen spricker.</span></p>
+    </aside>
+    <div id="machine"><div id="frame"><canvas id="board" aria-label="Spelplanen, 7 hjul och 7 rader"></canvas></div></div>
+    <aside id="right" aria-live="polite">
+      <h2>Vinster</h2>
+      <div class="chips" id="chips"></div>
+      <div class="sum" id="sum">Tryck på snurra eller mellanslag.</div>
+    </aside>
+  </div>
+
+  <div id="bar">
+    <div class="money" id="saldoBox"><span>SALDO</span><b id="saldo">1 000,00 kr</b></div>
+    <div class="ctrl">
+      <div class="betbox"><span>INSATS</span><b id="bet">10,00</b></div>
+      <button class="rbtn" id="betDown" aria-label="Lägre insats">−</button>
+      <button id="spin" aria-label="Snurra"></button>
+      <button class="rbtn" id="betUp" aria-label="Högre insats">+</button>
+      <button class="rbtn" id="autoBtn" aria-label="Autospel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg></button>
+      <button class="rbtn" id="turboBtn" aria-label="Turbo" aria-pressed="false"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg></button>
+    </div>
+    <div class="money" id="vinstBox"><span>VINST</span><b id="vinst">0,00 kr</b></div>
+  </div>
+</div>
+
+<script src="src/math.js"></script>
+<script>
+(function () {
+  'use strict';
+  var M = window.LagerMath;
+  M.usePreset('bas');
+  var N = 7, ROWS = 7, REELS = 7, CELLS = 49;
+  var NAMES = ['Stjärna', 'Diamant', 'Triangel', 'Cirkel', 'Kvadrat', 'Hexagon', 'Ring', 'Kors'];
+  var LAYC = ['#43bfae', '#9a86f5', '#f2a65e'];
+  var BETS = [1, 2, 5, 10, 20, 50, 100];
+  var $ = function (s) { return document.querySelector(s); };
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var state = { balance: 1000, betIdx: 3, busy: false, phase: 'idle', turbo: false, slam: false, hurry: false, auto: 0, roundWin: 0,
+    stats: { spins: 0, bet: 0, won: 0, best: 0, bestX: 0, longest: 0 } };
+  function bet() { return BETS[state.betIdx]; }
+  var nf = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function money(v) { return nf.format(v); }
+  function kr(v) { return money(v) + ' kr'; }
+
+  // ------------------------------------------------------------ tid och väntan (som C&T:s timing.js)
+  var clock = 0, timers = [], watchers = [];
+  function wait(sec, skippable) { return new Promise(function (res) { timers.push({ at: clock + sec, res: res, skip: !!skippable }); }); }
+  function waitFor(cond) { return new Promise(function (res) { if (cond()) res(); else watchers.push({ cond: cond, res: res }); }); }
+  function skipWaits() { for (var i = timers.length - 1; i >= 0; i--) if (timers[i].skip) { timers[i].res(); timers.splice(i, 1); } }
+  function tickTimers() {
+    for (var i = timers.length - 1; i >= 0; i--) if (clock >= timers[i].at) { var t = timers[i]; timers.splice(i, 1); t.res(); }
+    for (var j = watchers.length - 1; j >= 0; j--) if (watchers[j].cond()) { var w = watchers[j]; watchers.splice(j, 1); w.res(); }
+  }
+  var NORMAL = { stagger: 0.07, minSpin: 0.6, gap: 0.17, show: 1.0, popWait: 0.3, between: 0.15, vmax: 26 };
+  var TURBO = { stagger: 0.0, minSpin: 0.2, gap: 0.05, show: 0.5, popWait: 0.2, between: 0.06, vmax: 34 };
+  function T() { return state.turbo ? TURBO : NORMAL; }
+  function showTime(sec) { return state.hurry ? sec * 0.3 : sec; }
+  function winShowT(cls, acc) { return state.turbo ? T().show : [0.32, 0.85, 1.4][cls] * (acc || 1); }
+
+  // ------------------------------------------------------------ symbolerna (samma former som förut, ritade på canvas)
+  var SHAPES = [
+    { p: 'M20 3L24.6 14.3L36.2 14.7L27.3 22.4L30.5 33.7L20 27.2L9.5 33.7L12.7 22.4L3.8 14.7L15.4 14.3Z', f: '#f5c451', s: '#9c700c' },
+    { p: 'M20 3L35.5 20L20 37L4.5 20Z', f: '#ff6f91', s: '#a02c4c' },
+    { p: 'M20 4L36.5 34.5L3.5 34.5Z', f: '#a78bfa', s: '#563bbd' },
+    { c: 15.5, f: '#58c4f5', s: '#1d6c96' },
+    { p: 'M11 6H29A5 5 0 0 1 34 11V29A5 5 0 0 1 29 34H11A5 5 0 0 1 6 29V11A5 5 0 0 1 11 6Z', f: '#78dcb0', s: '#24835a' },
+    { p: 'M20 4L34 12L34 28L20 36L6 28L6 12Z', f: '#ffa35a', s: '#9d5512' },
+    { ring: 12, f: '#c9cde6', s: '#7d82a3' },
+    { p: 'M15 5H25V15H35V25H25V35H15V25H5V15H15Z', f: '#e8e2cf', s: '#857d66' }
+  ];
+  SHAPES.forEach(function (sh) {
+    if (sh.p) sh.path = new Path2D(sh.p);
+    else if (sh.c) { sh.path = new Path2D(); sh.path.arc(20, 20, sh.c, 0, Math.PI * 2); }
+  });
+  function drawShape(g, i) {
+    var sh = SHAPES[i];
+    g.lineJoin = 'round';
+    if (sh.ring) {
+      g.beginPath(); g.arc(20, 21.6, sh.ring, 0, Math.PI * 2); g.lineWidth = 7; g.strokeStyle = 'rgba(0,0,0,.35)'; g.stroke();
+      g.beginPath(); g.arc(20, 20, sh.ring, 0, Math.PI * 2); g.lineWidth = 9; g.strokeStyle = sh.s; g.stroke();
+      g.lineWidth = 6; g.strokeStyle = sh.f; g.stroke();
+      g.beginPath(); g.arc(20, 20, sh.ring, Math.PI * 1.1, Math.PI * 1.65); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.55)'; g.stroke();
+      return;
+    }
+    g.save(); g.translate(0, 1.6); g.fillStyle = 'rgba(0,0,0,.35)'; g.fill(sh.path); g.restore();
+    g.fillStyle = sh.f; g.fill(sh.path);
+    g.save(); g.clip(sh.path); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(0, 0, 40, 18); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(0, 27, 40, 13); g.restore();
+    g.lineWidth = 2; g.strokeStyle = sh.s; g.stroke(sh.path);
+  }
+  var sprites = [], blurs = [];
+  function buildSprites() {
+    var S = Math.max(16, Math.round(cell * dpr));
+    sprites = []; blurs = [];
+    for (var i = 0; i < 8; i++) {
+      var cv = document.createElement('canvas'); cv.width = cv.height = S;
+      var g = cv.getContext('2d'); g.scale(S / 40, S / 40); drawShape(g, i); sprites.push(cv);
+      var bv = document.createElement('canvas'); bv.width = bv.height = S;
+      var bg = bv.getContext('2d');
+      for (var k = -3; k <= 3; k++) { bg.globalAlpha = k === 0 ? 0.5 : 0.2; bg.drawImage(cv, 0, k * S * 0.045); }
+      blurs.push(bv);
+    }
+  }
+
+  // ------------------------------------------------------------ hjulmotorn (från C&T:s reels.js)
+  var WINDUP = 0.3, T_WINDUP = 0.13, ACC = 150, BOUNCE = 0.24, DEC_DIST = 1.7, GRAV = 70;
+  function mod(a, n) { return ((a % n) + n) % n; }
+  function visualSym() {
+    // bara för hjulen medan de snurrar (inte utfallet)
+    var w = M.CFG.baseW, t = 0, i; for (i = 0; i < 8; i++) t += w[i];
+    var u = Math.random() * t; for (i = 0; i < 8; i++) { u -= w[i]; if (u < 0) return i; } return 7;
+  }
+  function Cell(sym, y) { this.sym = sym; this.y = y; this.target = y; this.vy = 0; this.delay = 0; this.win = false; this.pop = -1; this.sz = 0.84; this.winHit = null; }
+  function Reel(i) { this.i = i; this.mode = 'grid'; this.cells = []; this.d = 0; this.v = 0; this.t = 0; this.phase = 'idle'; this.tape = {}; this.target = null; this.stopping = false; this.landed = true; this.done = true; }
+  Reel.prototype.setGrid = function (col) { this.mode = 'grid'; this.cells = col.map(function (s, y) { return new Cell(s, y); }); };
+  Reel.prototype.tapeAt = function (n) { if (!(n in this.tape)) this.tape[n] = visualSym(); return this.tape[n]; };
+  Reel.prototype.start = function (delay) {
+    this.tape = {};
+    for (var y = 0; y < ROWS; y++) this.tape[y] = this.cells[y] ? this.cells[y].sym : visualSym();
+    this.mode = 'spin'; this.d = 0; this.v = 0; this.t = -delay; this.phase = 'wait';
+    this.target = null; this.stopping = false; this.landed = false; this.done = false;
+  };
+  Reel.prototype.requestStop = function (col) { this.target = col; };
+  Reel.prototype.beginStop = function () {
+    this.stopping = true;
+    var fin = Math.ceil(this.d) + ROWS + 1;
+    this.final = fin; this.stopAt = fin + BOUNCE; this.decelAt = this.stopAt - DEC_DIST;
+    for (var y = 0; y < ROWS; y++) this.tape[y - fin] = this.target[y];
+    this.phase = 'runin';
+  };
+  Reel.prototype.update = function (dt) {
+    if (this.mode !== 'spin') return;
+    var vmax = T().vmax;
+    this.t += dt;
+    switch (this.phase) {
+      case 'wait': if (this.t >= 0) { this.phase = 'windup'; this.t = 0; this.d0 = this.d; } break;
+      case 'windup':
+        var k = Math.min(1, this.t / T_WINDUP);
+        this.d = this.d0 - WINDUP * Math.sin(k * Math.PI / 2);
+        if (k >= 1) { this.phase = 'accel'; this.v = 0; }
+        break;
+      case 'accel': this.v = Math.min(vmax, this.v + ACC * dt); this.d += this.v * dt; if (this.v >= vmax) this.phase = 'spin'; break;
+      case 'spin': this.v += (vmax - this.v) * Math.min(1, dt * 6); this.d += this.v * dt; break;
+      case 'runin':
+        this.v = Math.min(vmax, this.v + ACC * dt); this.d += this.v * dt;
+        if (this.d >= this.decelAt) { this.phase = 'decel'; this.dec = this.v * this.v / (2 * Math.max(0.05, this.stopAt - this.d)); }
+        break;
+      case 'decel':
+        this.v -= this.dec * dt; this.d += Math.max(this.v, 0) * dt;
+        if (this.v <= 0.5 || this.d >= this.stopAt) { this.d = this.stopAt; this.v = 0; this.phase = 'settle'; this.t = 0; this.landed = true; }
+        break;
+      case 'settle':
+        this.d = this.final + BOUNCE * Math.exp(-9 * this.t) * Math.cos(16 * this.t);
+        if (this.t > 0.42) { this.d = this.final; this.setGrid(this.target); this.done = true; this.phase = 'idle'; }
+        break;
+    }
+    if (this.target && !this.stopping && (this.phase === 'accel' || this.phase === 'spin')) this.beginStop();
+  };
+  Reel.prototype.settled = function () {
+    if (this.mode !== 'grid') return false;
+    for (var i = 0; i < this.cells.length; i++) { var c = this.cells[i]; if (c.delay > 0 || c.y !== c.target || c.vy !== 0 || c.pop >= 0) return false; }
+    return true;
+  };
+  Reel.prototype.updateCells = function (dt) {
+    if (this.mode !== 'grid') return;
+    for (var i = 0; i < this.cells.length; i++) {
+      var c = this.cells[i];
+      if (c.pop >= 0) c.pop += dt;
+      // symbolen krymper när rutan har lager (de syns i hörnen bakom den)
+      var yy = Math.max(0, Math.min(ROWS - 1, Math.round(c.y)));
+      var want = pos[yy * N + this.i].lv > 0 ? 0.6 : 0.84;
+      c.sz += (want - c.sz) * Math.min(1, dt * 10);
+      if (c.delay > 0) { c.delay -= dt; continue; }
+      if (c.y < c.target || c.vy !== 0) {
+        c.vy += GRAV * dt; c.y += c.vy * dt;
+        if (c.y >= c.target && c.vy > 0) { c.y = c.target; if (c.vy > 6) c.vy = -c.vy * 0.2; else c.vy = 0; }
+      }
+    }
+  };
+  var reels = [];
+  for (var ri = 0; ri < REELS; ri++) reels.push(new Reel(ri));
+  function cellAt(r, y) { var cs = reels[r].cells; for (var i = 0; i < cs.length; i++) if (cs[i].target === y) return cs[i]; return null; }
+
+  // ------------------------------------------------------------ lagren: de hör till rutan (positionen), inte till symbolen
+  // slots: lagrens innehåll (symbol eller -1 = tomt), i ordningen LAYER 1, 2, 3. Hörn: LAYER 1 nere till höger, LAYER 2
+  // nere till vänster, LAYER 3 uppe till höger.
+  var pos = [];
+  for (var pc = 0; pc < CELLS; pc++) pos.push({ lv: 0, slots: [], slotT: [], gone: [], hit: [], lvT: -9, burstT: -9, prev: null, prevT: -9 });
+  function syncPos(b, anim) {
+    for (var c = 0; c < CELLS; c++) {
+      var p = pos[c], cap = b.lv[c], syms = [], blanks = b.lblank[c], old = p.slots, out = [], fresh = [], i;
+      for (var s = 0; s < 9; s++) if (b.lmask[c] & (1 << s)) syms.push(s);
+      for (i = 0; i < cap; i++) out.push(null);
+      for (i = 0; i < Math.min(old.length, cap); i++) { var v = old[i], k = syms.indexOf(v); if (v >= 0 && k >= 0) { out[i] = v; syms.splice(k, 1); } }
+      for (i = 0; i < cap; i++) if (out[i] === null && syms.length) { out[i] = syms.shift(); fresh.push(i); }
+      for (i = 0; i < cap; i++) if (out[i] === null && blanks > 0) { out[i] = -1; blanks--; if (!(i < old.length && old[i] === -1)) fresh.push(i); }
+      for (i = 0; i < cap; i++) if (out[i] === null) out[i] = -1;
+      p.lv = cap; p.slots = out; p.gone = []; p.hit = [];
+      p.slotT = out.map(function (_, j) { return anim && fresh.indexOf(j) >= 0 ? clock : -9; });
+    }
+    updateTags();
+  }
+  // nytt snurr: lagren rivs (tonar bort), alla rutor börjar på LV0
+  function clearLayers() {
+    for (var c = 0; c < CELLS; c++) {
+      var p = pos[c];
+      if (p.lv > 0) { p.prev = { lv: p.lv, slots: p.slots.slice() }; p.prevT = clock; }
+      p.lv = 0; p.slots = []; p.slotT = []; p.gone = []; p.hit = [];
+    }
+    updateTags();
+  }
+  var tagN = [0, 0, 0];
+  function updateTags() {
+    var n = [0, 0, 0];
+    for (var c = 0; c < CELLS; c++) if (pos[c].lv > 0) n[pos[c].lv - 1]++;
+    for (var i = 0; i < 3; i++) {
+      var el = $('#tag' + (i + 1));
+      $('#n' + (i + 1)).textContent = n[i];
+      el.classList.toggle('on', n[i] > 0);
+      if (n[i] > tagN[i]) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    }
+    tagN = n;
+  }
+
+  // ------------------------------------------------------------ partiklar
+  var parts = [];
+  function shards(x, y, color, n, spread) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, sp = cell * (2 + Math.random() * 4) * (spread || 1);
+      parts.push({ kind: 'shard', x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - cell * 3, r: Math.random() * 6, vr: (Math.random() - 0.5) * 18, life: 0, max: 0.55 + Math.random() * 0.25, s: cell * (0.06 + Math.random() * 0.07), c: color });
+    }
+  }
+  function floatText(x, y, text, color) { parts.push({ kind: 'text', x: x, y: y, life: 0, max: 1.1, text: text, c: color }); }
+  function updateParts(dt) {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i]; p.life += dt;
+      if (p.life >= p.max) { parts.splice(i, 1); continue; }
+      if (p.kind === 'shard') { p.vy += cell * 22 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt; }
+      if (p.kind === 'text') p.y -= cell * 0.5 * dt;
+    }
+  }
+  function drawPart(g, p) {
+    var k = p.life / p.max;
+    g.save(); g.globalAlpha = 1 - k;
+    if (p.kind === 'shard') { g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); }
+    if (p.kind === 'text') {
+      g.font = '800 ' + Math.round(cell * 0.26) + 'px Unbounded, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = cell * 0.07; g.strokeStyle = '#0e1017'; g.strokeText(p.text, p.x, p.y); g.fillStyle = p.c; g.fillText(p.text, p.x, p.y);
+    }
+    g.restore();
+  }
+
+  // ------------------------------------------------------------ ritning av brädet
+  var canvas = $('#board'), ctx = canvas.getContext('2d');
+  var dpr = 1, boardPx = 420, cell = 60;
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function easeBack(k) { var e = k - 1; return 1 + 2.70158 * e * e * e + 1.70158 * e * e; }
+  function hexA(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  var CORNER = [[1, 1], [0, 1], [1, 0]];   // LAYER 1 nere höger, LAYER 2 nere vänster, LAYER 3 uppe höger
+
+  // Blixten som sveper över vinsten från vänster till höger (som i C&T).
+  var sweepFx = null, popFx = null;
+  function sweepX() {
+    if (!sweepFx) return Infinity;
+    var k = Math.min(1, (clock - sweepFx.t0) / sweepFx.dur);
+    if (k >= 1) return Infinity;
+    return sweepFx.x0 + (sweepFx.x1 - sweepFx.x0 + cell) * (1 - Math.pow(1 - k, 2));
+  }
+
+  function drawChip(g, x, y, i, sym, a, sc, hit, hl) {
+    var cs = cell * 0.42, m = cell * 0.05, cx = x + (CORNER[i][0] ? cell - m - cs : m), cy = y + (CORNER[i][1] ? cell - m - cs : m);
+    g.save(); g.globalAlpha *= a;
+    if (sc !== 1) { var ox = cx + cs / 2, oy = cy + cs / 2; g.translate(ox, oy); g.scale(sc, sc); g.translate(-ox, -oy); }
+    rr(g, cx, cy, cs, cs, cs * 0.24);
+    g.fillStyle = hexA(LAYC[i], 0.28); g.fill();
+    g.lineWidth = Math.max(1.5, cell * 0.028); g.strokeStyle = hit && hl ? '#ffffff' : LAYC[i]; g.stroke();
+    if (sym >= 0) {
+      var ms = cs * 0.7, mx = cx + (CORNER[i][0] ? cs - ms - cs * 0.06 : cs * 0.06), my = cy + (CORNER[i][1] ? cs - ms - cs * 0.06 : cs * 0.06);
+      if (hit && hl) { g.shadowColor = '#fff4cf'; g.shadowBlur = cell * 0.25; }
+      g.drawImage(sprites[sym], mx, my, ms, ms);
+    } else {
+      g.setLineDash([cs * 0.1, cs * 0.08]); g.lineWidth = 1; g.strokeStyle = hexA(LAYC[i], 0.7);
+      rr(g, cx + cs * 0.22, cy + cs * 0.22, cs * 0.56, cs * 0.56, cs * 0.12); g.stroke();
+    }
+    g.restore();
+  }
+
+  function drawPlate(g, c, time, hl, spinning) {
+    var r = c % N, row = Math.floor(c / N), x = r * cell, y = row * cell, p = pos[c], ins = cell * 0.035, w = cell - 2 * ins;
+    var anyHit = hl && (p.hit.some(Boolean) || p.topHit);
+    g.save();
+    if (hl && !anyHit) g.globalAlpha = 0.35;
+    rr(g, x + ins, y + ins, w, w, cell * 0.16);
+    g.fillStyle = p.lv ? hexA(LAYC[p.lv - 1], 0.13) : '#1c2031'; g.fill();
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.fill();
+    if (p.lv) { g.lineWidth = Math.max(1.5, cell * 0.035); g.strokeStyle = LAYC[p.lv - 1]; g.stroke(); }
+    // nivåprickarna uppe till vänster
+    for (var k = 0; k < p.lv; k++) { g.beginPath(); g.arc(x + cell * (0.13 + k * 0.09), y + cell * 0.13, cell * 0.032, 0, Math.PI * 2); g.fillStyle = LAYC[p.lv - 1]; g.fill(); }
+    // lagren från förra snurret tonar bort när hjulen startar
+    if (p.prev) {
+      var pk = (clock - p.prevT) / 0.3;
+      if (pk >= 1) p.prev = null;
+      else for (var q = 0; q < p.prev.slots.length; q++) drawChip(g, x, y, q, p.prev.slots[q], 1 - pk, 1 - pk * 0.4, false, false);
+    }
+    // lagren
+    for (var i = 0; i < p.slots.length; i++) {
+      var a = 1, sc = 1, t = clock - p.slotT[i];
+      if (t >= 0 && t < 0.4) sc = easeBack(t / 0.4);
+      var gk = p.gone[i] != null ? (clock - p.gone[i]) / 0.22 : -1;
+      if (gk >= 1) continue;
+      if (gk >= 0) { sc = gk < 0.4 ? 1 + gk * 0.7 : 1.28 * (1 - (gk - 0.4) / 0.6); a = 1 - Math.max(0, gk - 0.5) * 2; }
+      var hit = !!p.hit[i];
+      if (hl && hit && gk < 0) {
+        var wt = p.hitT != null ? time - p.hitT : -1;
+        if (wt >= 0 && wt < 0.55) sc *= 1 + 0.25 * Math.sin(wt / 0.55 * Math.PI);
+      }
+      drawChip(g, x, y, i, p.slots[i], a, sc, hit, hl);
+    }
+    // nivå upp: en ring i lagrets färg, spricka: vitt sken
+    var lt = clock - p.lvT;
+    if (lt >= 0 && lt < 0.6 && p.lv) { g.globalAlpha = 1 - lt / 0.6; g.lineWidth = cell * 0.06 * (1 - lt / 0.6) + 1; g.strokeStyle = LAYC[p.lv - 1]; rr(g, x + ins - lt * cell * 0.25, y + ins - lt * cell * 0.25, w + lt * cell * 0.5, w + lt * cell * 0.5, cell * 0.2); g.stroke(); g.globalAlpha = 1; }
+    var bt = clock - p.burstT;
+    if (bt >= 0 && bt < 0.5) { g.globalAlpha = 1 - bt / 0.5; g.fillStyle = '#fff6d8'; rr(g, x + ins, y + ins, w, w, cell * 0.16); g.fill(); g.globalAlpha = 1; }
+    g.restore();
+  }
+
+  function drawTop(g, c, x, time, hl) {
+    var y = c.y * cell;
+    if (y > boardPx || y < -cell) return;
+    var scale = 1, alpha = 1, rot = 0, wt = -1;
+    if (!(hl && c.win)) c.winHit = null;
+    if (c.pop >= 0) {
+      var k = c.pop / 0.22;
+      if (k >= 1) return;
+      scale = k < 0.4 ? 1 + k * 0.7 : 1.28 * (1 - (k - 0.4) / 0.6);
+      alpha = 1 - Math.max(0, k - 0.5) * 2;
+    } else if (hl) {
+      if (c.win) {
+        var bh = sweepX();
+        if (c.winHit == null && (bh === Infinity || bh >= x + cell * 0.5)) c.winHit = time;
+        wt = c.winHit == null ? -1 : time - c.winHit;
+        if (wt >= 0 && wt < 0.55) { var bk = wt / 0.55; scale = 1 + 0.22 * Math.sin(bk * Math.PI) * (1 - bk * 0.35); rot = 0.13 * Math.exp(-wt * 6) * Math.sin(wt * 24); }
+        else if (wt >= 0.55) scale = 1.04 + 0.035 * Math.sin((wt - 0.55) * 5.5);
+      } else alpha = 0.22;
+    }
+    var s = cell * c.sz * scale, cx = x + cell / 2, cy = y + cell / 2;
+    g.save(); g.globalAlpha = alpha;
+    if (hl && c.win && c.pop < 0 && wt >= 0) {
+      g.save(); g.globalAlpha = alpha * (wt < 0.4 ? 0.9 : 0.5 + 0.25 * Math.sin((wt - 0.4) * 5.5));
+      var grd = g.createRadialGradient(cx, cy, 0, cx, cy, cell * 0.55); grd.addColorStop(0, 'rgba(255,246,216,.85)'); grd.addColorStop(1, 'rgba(255,246,216,0)');
+      g.fillStyle = grd; g.fillRect(x, y, cell, cell); g.restore();
+    }
+    if (rot) { g.translate(cx, cy); g.rotate(rot); g.translate(-cx, -cy); }
+    g.drawImage(sprites[c.sym], cx - s / 2, cy - s / 2, s, s);
+    g.restore();
+  }
+
+  function render(time) {
+    var g = ctx;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, boardPx, boardPx);
+    g.fillStyle = '#121522'; g.fillRect(0, 0, boardPx, boardPx);
+    var hl = state.phase === 'show';
+    for (var c = 0; c < CELLS; c++) {
+      var cl = reels[c % N].mode === 'grid' ? cellAt(c % N, Math.floor(c / N)) : null;
+      pos[c].topHit = !!(cl && cl.win);
+      drawPlate(g, c, time, hl);
+    }
+    for (var r = 0; r < REELS; r++) {
+      var reel = reels[r], x = r * cell;
+      g.save(); g.beginPath(); g.rect(x, 0, cell, boardPx); g.clip();
+      if (reel.mode === 'spin') {
+        var blur = reel.v > 9, first = Math.floor(-reel.d) - 1, stretch = blur ? 1.06 : 1, s = cell * 0.84;
+        for (var n = first; n <= first + ROWS + 1; n++) {
+          var sy = (n + reel.d) * cell, sym = reel.tapeAt(n);
+          g.drawImage(blur ? blurs[sym] : sprites[sym], x + (cell - s) / 2, sy + (cell - s * stretch) / 2, s, s * stretch);
+        }
+      } else for (var i = 0; i < reel.cells.length; i++) drawTop(g, reel.cells[i], x, time, hl);
+      g.restore();
+    }
+    // blixten
+    var bx = sweepX();
+    if (hl && bx !== Infinity) {
+      var grd = g.createLinearGradient(bx - cell * 0.6, 0, bx + cell * 0.2, 0);
+      grd.addColorStop(0, 'rgba(255,255,255,0)'); grd.addColorStop(0.8, 'rgba(255,255,255,.22)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.fillRect(bx - cell * 0.6, 0, cell * 0.8, boardPx);
+    }
+    for (var p = 0; p < parts.length; p++) drawPart(g, parts[p]);
+    // beloppet på brädet (som C&T:s vinstsmäll)
+    if (popFx) {
+      var k = Math.min(1, (clock - popFx.t0) / 0.3), sc = easeBack(k);
+      g.save(); g.translate(popFx.x, popFx.y); g.scale(sc, sc);
+      g.font = '800 ' + Math.round(cell * popFx.size) + 'px Unbounded, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineJoin = 'round'; g.lineWidth = cell * 0.14; g.strokeStyle = '#1a1206'; g.strokeText(popFx.text, 0, 0);
+      g.fillStyle = '#ffd84d'; g.fillText(popFx.text, 0, 0);
+      g.restore();
+    }
+  }
+
+  // ------------------------------------------------------------ huvudloop och storlek (som C&T:s loop-and-layout.js)
+  // En bildruta i taget. Ritar webbläsaren inga bildrutor (dold flik eller panel) går klockan ändå vidare med en reserv
+  // (setInterval), så att spelet aldrig fastnar mitt i ett snurr. rafPending ser till att det bara finns en loop.
+  var last = performance.now(), lastFrameAt = 0, rafPending = false;
+  function loop(now) { rafPending = false; frame(now); }
+  function frame(now) {
+    lastFrameAt = performance.now();
+    var dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; clock += dt;
+    for (var r = 0; r < REELS; r++) { reels[r].update(dt); reels[r].updateCells(dt); }
+    updateParts(dt); tickTimers(); render(now / 1000);
+    if (!rafPending) { rafPending = true; requestAnimationFrame(loop); }
+  }
+  setInterval(function () { if (performance.now() - lastFrameAt > 120) frame(performance.now()); }, 40);
+  function layout() {
+    var mach = $('#machine'), fr = $('#frame'), cs = getComputedStyle(fr);
+    var pad = parseFloat(cs.paddingLeft) * 2 + parseFloat(cs.borderLeftWidth) * 2;
+    var aw = mach.clientWidth - pad, ah = mach.clientHeight - pad;
+    var size = Math.max(7 * 34, Math.min(aw, ah, 7 * 120));
+    var c = Math.floor(size / 7), nd = Math.min(2, window.devicePixelRatio || 1);
+    if (c === cell && nd === dpr && sprites.length) return;
+    cell = c; dpr = nd; boardPx = c * 7;
+    canvas.style.width = canvas.style.height = boardPx + 'px';
+    canvas.width = canvas.height = Math.round(boardPx * dpr);
+    buildSprites();
+  }
+
+  // ------------------------------------------------------------ spelflödet (som C&T:s spin-reels.js och flow.js)
+  async function spinReels(startBoard) {
+    var t = T(), cols = [];
+    for (var r = 0; r < REELS; r++) { var col = []; for (var y = 0; y < ROWS; y++) col.push(startBoard.top[y * N + r]); cols.push(col); }
+    state.phase = 'spinning'; hud();
+    for (r = 0; r < REELS; r++) reels[r].start(state.turbo ? 0 : r * t.stagger);
+    await wait(t.minSpin, true);
+    for (r = 0; r < REELS; r++) {
+      reels[r].requestStop(cols[r]);
+      if (r < REELS - 1) await wait(state.slam ? 0.03 : T().gap, !state.slam);
+    }
+    await waitFor(function () { return reels.every(function (x) { return x.done; }); });
+    state.slam = false;
+  }
+
+  function applyMoves(moves) {
+    for (var r = 0; r < REELS; r++) {
+      var reel = reels[r], old = reel.cells.slice().sort(function (a, b) { return a.target - b.target; }), next = [];
+      moves[r].forEach(function (mv) {
+        var c;
+        if (mv.fresh) c = new Cell(mv.sym, mv.from);
+        else { c = old[mv.from]; c.win = false; c.pop = -1; }
+        c.target = mv.to; c.vy = 0; c.delay = r * 0.035;
+        next.push(c);
+      });
+      next.sort(function (a, b) { return a.target - b.target; });
+      reel.cells = next;
+    }
+  }
+
+  async function presentStep(st, idx) {
+    var b = bet(), amount = st.x * b, stepX = st.x, cls = stepX < 1 ? 0 : stepX < 5 ? 1 : 2, acc = Math.max(0.6, Math.pow(0.85, idx));
+    // vilka symboler som vinner: överst (symbolen i rutan) eller i ett lager (hörnet)
+    var r0 = N, r1 = -1, big = null;
+    st.wins.forEach(function (w) {
+      w.cells.forEach(function (c) {
+        var r = c % N, y = Math.floor(c / N);
+        r0 = Math.min(r0, r); r1 = Math.max(r1, r);
+        if (st.before.top[c] === w.sym) { var cl = cellAt(r, y); if (cl) cl.win = true; }
+        var k = pos[c].slots.indexOf(w.sym);
+        if (k >= 0) { pos[c].hit[k] = true; }
+      });
+      if (!big || w.x > big.x) big = w;
+    });
+    // lagrens hörn studsar när blixten passerar
+    var dur = state.turbo ? 0.25 : 0.5;
+    sweepFx = { t0: clock, x0: r0 * cell, x1: (r1 + 1) * cell, dur: dur };
+    for (var c = 0; c < CELLS; c++) if (pos[c].hit.some(Boolean)) pos[c].hitT = clock + dur * ((c % N) - r0 + 0.5) / Math.max(1, r1 - r0 + 1);
+    // beloppet där den största klungan ligger
+    var sx = 0, sy = 0;
+    big.cells.forEach(function (c) { sx += (c % N + 0.5) * cell; sy += (Math.floor(c / N) + 0.5) * cell; });
+    popFx = { text: money(amount), x: Math.max(cell * 1.2, Math.min(boardPx - cell * 1.2, sx / big.cells.length)), y: Math.max(cell * 0.5, Math.min(boardPx - cell * 0.5, sy / big.cells.length)), t0: clock, size: [0.42, 0.52, 0.66][cls] };
+    showChips(st, idx);
+    state.phase = 'show';
+    state.roundWin += amount; setWin(state.roundWin, true);
+    await wait(showTime(winShowT(cls, acc)), true);
+    // vinnarna sprängs (överst) och försvinner (i lagren)
+    state.phase = 'pop'; sweepFx = null; popFx = null;
+    for (var r = 0; r < REELS; r++) reels[r].cells.forEach(function (cl) {
+      if (cl.win) { cl.pop = 0; shards((r + 0.5) * cell, (cl.y + 0.5) * cell, SHAPES[cl.sym].f, 7); }
+    });
+    for (c = 0; c < CELLS; c++) pos[c].hit.forEach(function (h, k) {
+      if (h) { pos[c].gone[k] = clock; var cs = CORNER[k]; shards((c % N + (cs[0] ? 0.78 : 0.22)) * cell, (Math.floor(c / N) + (cs[1] ? 0.78 : 0.22)) * cell, LAYC[k], 4, 0.6); }
+    });
+    await wait(showTime(T().popWait * acc * (cls === 0 ? 0.5 : 1)));
+    // lavinen: symbolerna faller, och lagren växer i rutorna som vann
+    applyMoves(st.moves);
+    syncPos(st.after, true);
+    for (c = 0; c < CELLS; c++) if (st.lvup[c]) pos[c].lvT = clock;
+    st.grow.forEach(function (z) { pos[z].lvT = clock; });
+    st.bursts.forEach(function (z, k) {
+      pos[z].burstT = clock;
+      shards((z % N + 0.5) * cell, (Math.floor(z / N) + 0.5) * cell, '#fff1c4', 12, 1.3);
+      if (k === 0) floatText((z % N + 0.5) * cell, (Math.floor(z / N) + 0.3) * cell, 'SPRICKER!', '#f2a65e');
+    });
+    await waitFor(function () { return reels.every(function (x) { return x.settled(); }); });
+    await wait(showTime(T().between * acc), true);
+    state.phase = 'tumble';
+  }
+
+  function showChips(st, idx) {
+    var b = bet(), list = st.wins.slice().sort(function (p, q) { return q.x - p.x; });
+    $('#chips').innerHTML = list.slice(0, 4).map(function (w) {
+      return '<div class="chip"><svg viewBox="0 0 40 40" aria-hidden="true"><use href="#s' + w.sym + '"/></svg><span>' + NAMES[w.sym] + '<small>' + w.cells.length + ' rutor' + (w.lvs ? ' + ' + w.lvs + ' lager = ' + w.size : '') + '</small></span><b>' + money(w.x * b) + '</b></div>';
+    }).join('') + (list.length > 4 ? '<div class="sum">+ ' + (list.length - 4) + ' klungor till</div>' : '');
+    $('#sum').textContent = 'Lavin ' + (idx + 1);
+  }
+
+  function setWin(v, count) {
+    var el = $('#vinst');
+    el.textContent = kr(v);
+    if (count) { el.classList.remove('count'); void el.offsetWidth; el.classList.add('count'); }
+  }
+
+  async function spin(seed, test) {
+    if (state.busy) return;
+    var b = bet();
+    if (!test && state.balance < b - 1e-9) { toast('Saldot räcker inte. Sänk insatsen eller fyll på saldot under TEST.'); state.auto = 0; hud(); return; }
+    closePops();
+    state.busy = true; state.slam = false; state.hurry = false; state.roundWin = 0;
+    if (!test) { state.balance -= b; state.stats.spins++; state.stats.bet += b; }
+    setWin(0); $('#chips').innerHTML = ''; $('#sum').textContent = test ? 'TEST: ett riktigt utfall ur matten.' : ' ';
+    var g = M.playGame(M.mulberry32(seed), true), base = g.base, rec = base.record || [];
+    clearLayers();
+    hud();
+    await spinReels(base.start);
+    state.phase = 'idle'; hud();
+    if (rec.length) await wait(showTime(0.15), true);
+    for (var i = 0; i < rec.length; i++) await presentStep(rec[i], i);
+    for (var r = 0; r < REELS; r++) reels[r].cells.forEach(function (c) { c.win = false; });
+    state.phase = 'idle';
+    var win = g.x * b, x = g.x;
+    state.roundWin = win; setWin(win, false);
+    $('#sum').textContent = rec.length ? rec.length + ' lavinsteg' + (base.bursts ? ', ' + base.bursts + (base.bursts === 1 ? ' spricka' : ' sprickor') : '') + ', högsta LAYER ' + base.maxLv + (test ? ' (TEST)' : '') : 'Ingen vinst den här gången.';
+    if (rec.length === 0) $('#chips').innerHTML = '';
+    if (x >= 20) await bigWin(win, x);
+    if (!test) {
+      state.balance += win; state.stats.won += win;
+      if (win > state.stats.best) { state.stats.best = win; state.stats.bestX = x; }
+      if (rec.length > state.stats.longest) state.stats.longest = rec.length;
+    }
+    state.busy = false; state.hurry = false;
+    hud();
+    if (!test && state.auto > 0) {
+      await wait(0.35);
+      if (state.auto > 0 && !state.busy) { state.auto--; hud(); spin(rand32(), false); }
+    }
+  }
+
+  // storvinst (som C&T:s storvinst-ruta): räknas upp, klick hoppar till slutet och stänger
+  function bigWin(win, x) {
+    return new Promise(function (res) {
+      var tier = x >= 500 ? 'EPISK VINST' : x >= 100 ? 'MEGAVINST' : 'STOR VINST';
+      var dur = (x >= 500 ? 4.2 : x >= 100 ? 3.2 : 2.2) * (state.turbo ? 0.5 : 1), t0 = performance.now(), done = false;
+      var ov = document.createElement('div'); ov.className = 'ov';
+      ov.innerHTML = '<div class="big" role="dialog" aria-label="' + tier + '"><div class="tier">' + tier + '</div><div class="amt" id="bwAmt">0,00 kr</div><div class="xx">' + x.toLocaleString('sv-SE', { maximumFractionDigits: 1 }) + ' gånger insatsen</div><div class="tap">Klicka för att fortsätta</div></div>';
+      document.body.appendChild(ov);
+      var amt = ov.querySelector('#bwAmt');
+      function tick() {
+        if (done) return;
+        var k = Math.min(1, (performance.now() - t0) / 1000 / dur);
+        amt.textContent = kr(win * (1 - Math.pow(1 - k, 3)));
+        if (k < 1) requestAnimationFrame(tick); else { amt.textContent = kr(win); setTimeout(close, state.auto > 0 ? 1200 : 2600); }
+      }
+      function close() { if (done) return; done = true; ov.remove(); res(); }
+      ov.addEventListener('click', function () { if ((performance.now() - t0) / 1000 < dur) { t0 = -1e9; } else close(); });
+      requestAnimationFrame(tick);
+    });
+  }
+
+  // ------------------------------------------------------------ gränssnittet
+  var SPIN_ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>';
+  var STOP_ICO = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+  function hud() {
+    $('#saldo').textContent = kr(state.balance);
+    $('#bet').textContent = money(bet());
+    $('#betDown').disabled = state.busy || state.betIdx === 0;
+    $('#betUp').disabled = state.busy || state.betIdx === BETS.length - 1;
+    var sp = $('#spin'), spinning = state.phase === 'spinning';
+    sp.classList.toggle('stop', spinning);
+    sp.innerHTML = spinning ? STOP_ICO : SPIN_ICO;
+    sp.setAttribute('aria-label', spinning ? 'Stoppa hjulen' : state.busy ? 'Visa snabbare' : 'Snurra');
+    var ab = $('#autoBtn');
+    ab.classList.toggle('on', state.auto > 0);
+    ab.innerHTML = ab.innerHTML.replace(/<em>.*<\/em>/, '') + (state.auto > 0 ? '<em>' + state.auto + '</em>' : '');
+    $('#turboBtn').classList.toggle('on', state.turbo);
+    $('#turboBtn').setAttribute('aria-pressed', String(state.turbo));
+  }
+  function rand32() { var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0]; }
+  // snurrknappen: snurra, eller stoppa hjulen (slam), eller visa vinsterna snabbare (hurry), som i C&T
+  function press() {
+    if (!state.busy) { state.auto = 0; spin(rand32(), false); return; }
+    if (state.phase === 'spinning') { state.slam = true; skipWaits(); }
+    else { state.hurry = true; skipWaits(); }
+    hud();
+  }
+  var toastT = null;
+  function toast(msg) {
+    var t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    t.textContent = msg; clearTimeout(toastT); toastT = setTimeout(function () { t.remove(); }, 3200);
+  }
+  function closePops() { document.querySelectorAll('.pop').forEach(function (p) { p.remove(); }); }
+  function popover(anchor, html, above) {
+    closePops();
+    var p = document.createElement('div'); p.className = 'pop'; p.innerHTML = html; document.body.appendChild(p);
+    var r = anchor.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+    var left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    var top = above ? r.top - h - 10 : r.bottom + 8;
+    p.style.left = left + 'px'; p.style.top = Math.max(8, top) + 'px';
+    setTimeout(function () { document.addEventListener('pointerdown', function off(e) { if (!p.contains(e.target) && e.target !== anchor) { p.remove(); document.removeEventListener('pointerdown', off); } }); }, 0);
+    return p;
+  }
+  function findSeed(pred) {
+    for (var i = 0; i < 300000; i++) { var s = rand32(); if (pred(M.playGame(M.mulberry32(s), false))) return s; }
+    return null;
+  }
+  function test(pred) {
+    closePops(); state.auto = 0;
+    var s = findSeed(pred);
+    if (s === null) { toast('Hittade inget sådant utfall den här gången. Prova igen.'); return; }
+    spin(s, true);
+  }
+  $('#btnTest').addEventListener('click', function () {
+    if (state.busy) return;
+    var st = state.stats, rtp = st.bet ? (100 * st.won / st.bet).toLocaleString('sv-SE', { maximumFractionDigits: 1 }) + ' %' : '–';
+    var p = popover(this, '<h3>TEST · riktiga utfall, kostar inget</h3>' +
+      '<button data-t="burst">Lavin med LAYER 3 och spricka</button>' +
+      '<button data-t="long">Lång lavin (12+ steg)</button>' +
+      '<button data-t="big">Stor vinst (100x+)</button>' +
+      '<button data-t="refill">Fyll på saldot (1 000 kr)</button>' +
+      '<h3>Passet</h3><dl><dt>Snurr</dt><dd>' + st.spins + '</dd><dt>Återbetalt</dt><dd>' + rtp + '</dd><dt>Största vinst</dt><dd>' + (st.best ? kr(st.best) : '–') + '</dd><dt>Längsta lavin</dt><dd>' + (st.longest ? st.longest + ' steg' : '–') + '</dd></dl>', false);
+    p.addEventListener('click', function (e) {
+      var t = e.target.getAttribute && e.target.getAttribute('data-t');
+      if (t === 'burst') test(function (g) { return g.base.bursts > 0; });
+      if (t === 'long') test(function (g) { return g.base.steps >= 12; });
+      if (t === 'big') test(function (g) { return g.x >= 100; });
+      if (t === 'refill') { state.balance = 1000; closePops(); hud(); }
+    });
+  });
+  $('#autoBtn').addEventListener('click', function () {
+    if (state.auto > 0) { state.auto = 0; hud(); return; }
+    var p = popover(this, '<h3>Autospel</h3><div class="row"><button data-n="10">10</button><button data-n="25">25</button><button data-n="50">50</button><button data-n="100">100</button></div>', true);
+    p.addEventListener('click', function (e) {
+      var n = parseInt(e.target.getAttribute && e.target.getAttribute('data-n'), 10);
+      if (!n) return;
+      closePops(); state.auto = n - 1; hud();
+      if (!state.busy) spin(rand32(), false);
+    });
+  });
+  $('#turboBtn').addEventListener('click', function () { state.turbo = !state.turbo; hud(); });
+  $('#betDown').addEventListener('click', function () { if (state.betIdx > 0) { state.betIdx--; hud(); } });
+  $('#betUp').addEventListener('click', function () { if (state.betIdx < BETS.length - 1) { state.betIdx++; hud(); } });
+  $('#spin').addEventListener('click', press);
+  canvas.addEventListener('click', function () { if (state.busy) press(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' && !e.repeat && !document.querySelector('.ov') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) { e.preventDefault(); press(); }
+  });
+  $('#btnFull').addEventListener('click', function () {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+      else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () { toast('Helskärm går inte här.'); });
+    } catch (e) { toast('Helskärm går inte här.'); }
+  });
+  $('#btnInfo').addEventListener('click', function () {
+    var b = bet(), sizes = [5, 8, 10, 15, 20, 30, 50];
+    var rows = '';
+    for (var s = 0; s < 8; s++) rows += '<tr><td><svg viewBox="0 0 40 40" aria-hidden="true"><use href="#s' + s + '"/></svg>' + NAMES[s] + '</td>' + sizes.map(function (z) { return '<td>' + money(M.payFor(s, z) * b) + '</td>'; }).join('') + '</tr>';
+    var ov = document.createElement('div'); ov.className = 'ov';
+    ov.innerHTML = '<div class="card" role="dialog" aria-label="Regler"><button class="ibtn x" aria-label="Stäng">✕</button><h2>Så funkar det</h2><ul>' +
+      '<li>7 hjul och 7 rader. Vinst är en klunga på minst 5 rutor som sitter ihop (upp, ner, vänster, höger) med samma symbol.</li>' +
+      '<li>Vinnarna sprängs, symbolerna ovanför faller ner och nya faller in uppifrån. Lavinen fortsätter så länge det blir nya vinster.</li>' +
+      '<li>Varje ruta som är med i en vinst levlar och får ett lager bakom symbolen: LAYER 1, sedan LAYER 2 och LAYER 3. Lagret hör till rutan, inte till symbolen som faller.</li>' +
+      '<li>Lagren syns i rutans hörn. Ett lager har en symbol eller är tomt, och rutan räknas som alla sina symboler.</li>' +
+      '<li>Varje lager räknas som en ruta extra i klungan: 8 rutor på LAYER 2 betalar som en klunga på 24.</li>' +
+      '<li>En ruta på LAYER 3 som vinner igen spricker: den börjar om utan lager, och rutorna runt omkring levlar ett steg.</li>' +
+      '<li>Varje snurr börjar utan lager. Maxvinst 10 000 gånger insatsen. Återbetalning 96,0 % (preliminär).</li></ul>' +
+      '<div class="paywrap"><table class="pay"><thead><tr><th>Storlek</th>' + sizes.map(function (z) { return '<th>' + z + (z === 50 ? '+' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p style="margin:0;color:var(--muted);font-size:.8rem">Vinst i kronor vid insatsen ' + kr(b) + '. Storlek = rutor + lager.</p></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov || e.target.closest('.x')) ov.remove(); });
+  });
+
+  // ------------------------------------------------------------ start
+  function start(data) {
+    if (data && typeof data.balance === 'number') { state.balance = data.balance; state.betIdx = data.betIdx; state.turbo = !!data.turbo; state.stats = data.stats || state.stats; }
+    layout();
+    // startbilden: slutbrädet från ett riktigt snurr med lavin, så att lagren syns direkt
+    var s = findSeed(function (g) { return g.base.steps >= 3 && g.base.maxLv >= 2; });
+    var g = M.playGame(M.mulberry32(s === null ? 7 : s), true), end = g.base.end;
+    for (var r = 0; r < REELS; r++) { var col = []; for (var y = 0; y < ROWS; y++) col.push(end.top[y * N + r]); reels[r].setGrid(col); }
+    syncPos(end, false);
+    hud();
+    if (window.ResizeObserver) new ResizeObserver(layout).observe($('#machine'));
+    window.addEventListener('resize', layout);
+    if (document.fonts && document.fonts.load) document.fonts.load('800 20px Unbounded').catch(function () {});
+    last = performance.now(); frame(last);
+  }
+  var hot = window.claude && window.claude.hot;
+  if (hot && hot.snapshot) hot.snapshot(function () { return { balance: state.busy ? state.balance + bet() : state.balance, betIdx: state.betIdx, turbo: state.turbo, stats: state.stats }; });
+  if (hot && hot.ready) hot.ready(start); else start(hot && hot.data ? hot.data : {});
+})();
+</script>
