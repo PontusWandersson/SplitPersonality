@@ -111,6 +111,12 @@ rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 
 // cirka 96 %. Bonusarnas vinster är scale × fsScale och scale × maniacScale.
 var CAL = { scale: 0.4338, fsScale: 3.649, maniacScale: 23.05 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
+// HUNT-lägena i köpmenyn (7x7, utan lager; mätt i sidan 2026-11-10 med CTMath.playGame(rng, vägg, läge)): två bomber på
+// hjul 1–6 och ingen på hjul 7, så att Bonusspelet kommer ungefär var 41:a snurr (C&T: var 39:e). BONUS HUNT ger 2,735x per
+// snurr (1,4 M snurr) och ALTER EGO HUNT 12,23x (760 000 snurr), så priserna 2,85x och 12,75x ger cirka 96,0 och 95,9 %.
+rep('  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 3];', '  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 2, 0];', 'bomberna i HUNT-lägena');
+rep("    hunt: { price: 3, strips: 'hunt' },\n    inf: { price: 14, strips: 'hunt', inf: true },", "    hunt: { price: 2.85, strips: 'hunt' },\n    inf: { price: 12.75, strips: 'hunt', inf: true },", 'HUNT-lägenas priser');
+rep('var MODE_RTP = { hunt: 96.6, inf: 95.8, lay3: 96.5 };', 'var MODE_RTP = { hunt: 96.0, inf: 95.9, lay3: 96.5 };', 'HUNT-lägenas återbetalning');
 rep("document.title = 'C&T Maniac';", "document.title = 'ALTER EGO';", 'fliktiteln');
 // inget ljud alls (Pontus 2026-11-10: "Ta bort allt ljud"): ljudmotorn startar aldrig, som i en webbläsare utan Web Audio
 // (C&T:s kod klarar det: alla ljud kollar Sound.ctx). Ljudknappen står kvar men gör inget hörbart; ljudfilerna hämtas inte.

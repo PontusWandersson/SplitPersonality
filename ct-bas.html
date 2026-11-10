@@ -3681,14 +3681,14 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   // Priserna är satta från simuleringar (scratchpad sim-lagen.js, 5 M snurr per läge, 2026-11-10): se kommentaren vid MODES.
   // Inte certifierat; priserna finjusteras och kontrolleras med långa körningar när matten är klar.
   var HUNT_BLOCKS = {}; for (var hb in BASE_BLOCKS) HUNT_BLOCKS[hb] = BASE_BLOCKS[hb].slice();
-  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 3];
+  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 2, 0];
   STRIPS.hunt = buildStrips(HUNT_BLOCKS, 0xC7A11AC);
   // Simulering genom playGame (scratchpad sim-motor.js, 4 M snurr per läge, 2026-11-10): hunt 2,898x per snurr = 96,6 %
   // ±0,56 av 3x; inf 13,41x per snurr (två körningar, 13,44 och 13,37) = 95,8 % ±0,4 av 14x, maxvinsten cirka var 50 000:e
   // snurr; lay3 1,351x per snurr = 96,5 % ±0,53 av 1,4x, vinst på 48 % av snurren (31 % utan läge).
   var MODES = {
-    hunt: { price: 3, strips: 'hunt' },
-    inf: { price: 14, strips: 'hunt', inf: true },
+    hunt: { price: 2.85, strips: 'hunt' },
+    inf: { price: 12.75, strips: 'hunt', inf: true },
     lay3: { price: 1.4, depth: 3 }
   };
   // en betald omgång i ett läge (playGame med mode); samma ordning som playGame, med lägets hjul och lager
@@ -3856,7 +3856,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   // namn ('' = inget). Ett snurr kostar insatsen gånger lägets pris; vinsterna räknas som vanligt i gånger insatsen.
   // Läget gäller bara den här sessionen (det sparas inte), så att ingen av misstag fortsätter med ett dyrare snurr.
   // lägenas återbetalning, uppmätt med 4 M snurr per läge (scratchpad sim-motor.js, 2026-11-10; preliminärt)
-  var MODE_RTP = { hunt: 96.6, inf: 95.8, lay3: 96.5 };
+  var MODE_RTP = { hunt: 96.0, inf: 95.9, lay3: 96.5 };
   function modePrice(m) { var d = m && M.MODES[m]; return d ? d.price : 1; }
   function spinCost(m) { return Math.round(bet() * modePrice(m === undefined ? state.mode : m)); }
   var nf = new Intl.NumberFormat(LOC, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
