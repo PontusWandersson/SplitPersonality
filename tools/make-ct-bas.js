@@ -18,6 +18,12 @@ if (!SRC) { console.error('Ange C&T-filen: node tools/make-ct-bas.js <index.html
 var h = fs.readFileSync(SRC, 'utf8');
 var BLANK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 var KEEP = {}; for (var k = 16; k <= 25; k++) KEEP[k] = true;   // LAYER-brickorna och lagermärkena
+// Målade affischer och menyer som har en ritad textversion i C&T: tom källa, så att textversionen visas i stället för en
+// tom ruta (köpaffischen 26, bandspelaren 27, ODD-menyn och dess knappar 28–34, köpbekräftelsen 35–36, bonusens
+// summering 37–38, bonusens startaffisch 39–40, "välkommen tillbaka" 41, storvinstens titlar 46–59, ODD INFINITY-skylten
+// 65–68). All annan konst blir en genomskinlig bild (koden ritar då inte heller sin reservkonst).
+var EMPTY = {}; [26, 27].concat(range(28, 41), range(46, 59), range(65, 68)).forEach(function (i) { EMPTY[i] = true; });
+function range(a, b) { var o = []; for (var i = a; i <= b; i++) o.push(i); return o; }
 var count = { kvar: 0, bort: 0 };
 function must(re, what) { if (!re.test(h)) { console.error('Hittade inte: ' + what); process.exit(1); } }
 function rep(from, to, what, all) {
@@ -31,7 +37,7 @@ function rep(from, to, what, all) {
 // 1. konsten bort (utom brickorna)
 h = h.replace(/__D\[(\d+)\]="data:image\/[a-z]+;base64,[A-Za-z0-9+\/=]+"/g, function (m, i) {
   if (KEEP[+i]) { count.kvar++; return m; }
-  count.bort++; return '__D[' + i + ']="' + BLANK + '"';
+  count.bort++; return '__D[' + i + ']="' + (EMPTY[+i] ? '' : BLANK) + '"';
 });
 h = h.replace(/data:image\/(webp|png|jpeg|jpg|gif);base64,[A-Za-z0-9+\/=]{200,}/g, function (m, t, off, str) {
   var pre = /__D\[(\d+)\]="$/.exec(str.slice(Math.max(0, off - 14), off));
@@ -98,6 +104,70 @@ rep('for (var k = 0; k < 6; k++) if (k !== rows[r] - 1)', 'for (var k = 0; k < R
 rep("if (r < 5) s += '<text x=\"' + (x0 + 25)", "if (r < REELS - 1) s += '<text x=\"' + (x0 + 25)", 'vägbildens kryss');
 rep('var L = 0; for (var i = 1; i < 6; i++) L += Math.hypot', 'var L = 0; for (var i = 1; i < REELS; i++) L += Math.hypot', 'vägbildens linje');
 rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 95" aria-hidden="true">', 'vägbildens storlek');
+// ---- 7x7-mattens skalor och bomber (prototyp, mätt i sidan 2026-11-10 med CTMath.playGame/buyGame, inte certifierat).
+// Grundspelet: en bomb på hjul 1–6 och ingen på hjul 7 (C&T hade 1,1,1,1,1,2 på sex hjul; sju hjul med sju rader gav
+// Bonusspelet var 72:a snurr). Då kommer Bonusspelet ungefär var 245:e snurr. Skalorna: hela spelet cirka 96 % (grundspelet
+// cirka 62 %, bonusarna cirka 34 %), köpt Bonusspel och köpt ALTER EGO cirka 96 %. Bonusarnas vinster är scale × fsScale
+// och scale × maniacScale.
+var CAL = { scale: 0.10713, fsScale: 0.08228, maniacScale: 0.5195 };
+rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
+rep("document.title = 'C&T Maniac';", "document.title = 'ALTER EGO';", 'fliktiteln');
+// summeringen efter bonusen spelar en ton per diagonal; 7x7 har 13 diagonaler (6x6 hade 11), annars blir tonen NaN och bonusen fastnar
+rep('var BC_PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24];', 'var BC_PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27, 29];', 'summeringens toner');
+// storvinst-rutans bakgrund och nivåtitlar är konst (bortplockad): dölj de tomma bilderna, så att ingen trasig bildram syns
+rep('</head>', '<style>img.ws-bg[src=""], img.ws-ti[src=""], img.ws-bg:not([src]), img.ws-ti:not([src]) { visibility: hidden; }</style></head>', 'storvinstens tomma bilder');
+rep("var kick = state.fs.maniac ? txl('Infinity klart') : txl('Bonusspel klart');", "var kick = state.fs.maniac ? txl('ALTER EGO klart') : txl('Bonusspel klart');", 'summeringens rubrik');
+rep("'Infinity klart': 'Infinity complete',", "'ALTER EGO klart': 'ALTER EGO complete',", 'summeringens rubrik på engelska');
+// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Spelmotorn: Killen (2), Katten (3) och Växten (4) har
+// var sitt steg 1–5. Steget = hur många lager karaktärens vinster når (steg 5: alla lager och INFINITY). 5 karaktärssymboler i vinster (brädet och lagren)
+// ger nästa steg. Andra symboler når bara LAYER 1. C&T:s gemensamma stege är avstängd i den bonusen.
+rep('var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;',
+  'var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;\n' +
+  '  // ALTER EGO: AE = { s: steg, c: symboler mot nästa steg } för Killen, Katten och Växten (bara i superbonusen)\n' +
+  '  TIME.alterEgo = true;\n' +
+  '  // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)\n' +
+  '  TIME.scale = ' + CAL.scale + '; TIME.fsScale = ' + CAL.fsScale + '; TIME.maniacScale = ' + CAL.maniacScale + ';\n' +
+  '  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_NEED = 5, AE = null;\n' +
+  '  function aeLim(s) { if (!AE) return LADU; var ci = AE_CH[s]; return ci == null ? 1 : AE.s[ci] >= 5 ? 99 : AE.s[ci]; }\n' +
+  '  function aeInf(s) { if (!AE) return LADU >= (TIME.infAt || 6); var ci = AE_CH[s]; return ci != null && AE.s[ci] >= 5; }', 'AE i spelmotorn');
+rep('for (var k = 0; k < Math.min(layers.length, LADU) && !hit.rows.length; k++)', 'for (var k = 0; k < Math.min(layers.length, aeLim(s)) && !hit.rows.length; k++)', 'lagrens djup per symbol');
+rep('if (!hit.rows.length && INFB && LADU >= (TIME.infAt || 6)) for (var ib = 0;', 'if (!hit.rows.length && INFB && aeInf(s)) for (var ib = 0;', 'INFINITY per symbol');
+rep('      if (LADX && opts.fs && layers) {',
+  '      // ALTER EGO: varje karaktärssymbol i en vinst (på brädet och i lagren) fyller karaktärens mätare; AE_NEED\n' +
+  '      // symboler ger nästa steg (från nästa lavinsteg). En stor vinst kan ge flera steg på en gång.\n' +
+  '      if (AE && opts.fs && layers) {\n' +
+  '        var aeUp = [];\n' +
+  '        ev.wins.forEach(function (w) {\n' +
+  '          var ci = AE_CH[w.sym]; if (ci == null || AE.s[ci] >= 5) return;\n' +
+  '          var n = 0; w.cols.forEach(function (c) { n += c.length; }); if (w.gcols) w.gcols.forEach(function (c) { n += c.length; });\n' +
+  '          AE.c[ci] += n;\n' +
+  '          while (AE.c[ci] >= AE_NEED && AE.s[ci] < 5) { AE.c[ci] -= AE_NEED; AE.s[ci]++; if (aeUp.indexOf(ci) < 0) aeUp.push(ci); }\n' +
+  '          if (AE.s[ci] >= 5) AE.c[ci] = 0;\n' +
+  '        });\n' +
+  '        steps[steps.length - 1].ae = { s: AE.s.slice(), c: AE.c.slice(), up: aeUp };\n' +
+  '      }\n' +
+  '      if (LADX && opts.fs && layers) {', 'stegen i playRound');
+rep('LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;',
+  'LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;\n' +
+  '    AE = maniac && INFB && TIME.alterEgo ? { s: [1, 1, 1], c: [0, 0, 0] } : null;\n' +
+  '    if (AE) { LADX = 0; LADU = 99; lad0 = LADU; }', 'AE vid bonusstart');
+rep('var ladIn = LADX ? { u: LADU, c: LADC } : null;', 'var ladIn = LADX ? { u: LADU, c: LADC } : null, aeIn = AE ? { s: AE.s.slice(), c: AE.c.slice() } : null;', 'AE per frispinn');
+rep('f.retrigger = f.scatters >= 3 ? more : 0; f.ladIn = ladIn;', 'f.retrigger = f.scatters >= 3 ? more : 0; f.ladIn = ladIn; f.aeIn = aeIn;', 'AE per frispinn (2)');
+rep('var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;',
+  'var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;\n' +
+  '    var aeEnd = AE ? AE.s.slice() : null; AE = null;', 'AE vid bonusslut');
+rep('return { lad: ladEnd, ladStart: ladS, maniac: maniac,', 'return { lad: ladEnd, ladStart: ladS, ae: aeEnd, maniac: maniac,', 'AE i bonusens resultat');
+// spelet: bilderna per steg, panelen och LEVEL UP (src/alter-ego.js), inkopplat i bonusflödet
+var AE_JS = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego.js'), 'utf8');
+rep('  async function runFreeSpins(', AE_JS + '  async function runFreeSpins(', 'runFreeSpins');
+rep('    if (!document.body.classList.contains(\'fs\')) fsOn();\n', '    if (!document.body.classList.contains(\'fs\')) fsOn();\n    if (maniac && M.TIME.alterEgo) aeInit();\n', 'aeInit');
+rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeIn) { aeSprites(res.aeIn.s); aeRender(res.aeIn); }\n      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', 'aeRender per frispinn');
+rep('      if (fs) await ladShow(st);\n', '      if (fs) await ladShow(st);\n      if (fs && st.ae) await aeShow(st);\n', 'aeShow');
+rep('    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', '    aeEnd();\n    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', 'aeEnd');
+rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
+rep("var INF_LADDER = '<p><b>3 lagervinster</b> öppnar nästa LAYER. Sist öppnas <b class=\"inf-word\">INFINITY</b></p>';",
+  "var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. Steget är hur många LAYER karaktären når. <b>Steg 5 = ALTER EGO</b> når <b class=\"inf-word\">INFINITY</b></p>';", 'bonusens regel');
+
 // rakt in i spelet: inget ODD HEAD-intro och ingen startskärm med "Hur man spelar" (C&T:s egen brytare; Pontus
 // 2026-11-10: "ta bort introt och 'hur man spelar' nu när vi ska börja bygga produkten"). Reglerna finns kvar i menyn.
 rep('var INTRO_PAUSAT = false;', 'var INTRO_PAUSAT = true;', 'INTRO_PAUSAT');
