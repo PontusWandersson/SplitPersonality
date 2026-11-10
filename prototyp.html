@@ -412,10 +412,10 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
   // vinner på en LAYER 3-ruta som spricker); bokstäverna har en bild. scale: hur stor bilden ritas.
   function lvSrcs(dir) { return [0, 1, 2, 3, 4].map(function (k) { return dir + '/lv' + k + '.webp'; }); }
   var FIGS = {
-    0: { srcs: lvSrcs('assets/figur'), scale: 1.16 },
-    4: { srcs: ['assets/ikoner/A.webp'], scale: 1.04 },
-    5: { srcs: ['assets/ikoner/K.webp'], scale: 1.04 },
-    6: { srcs: ['assets/ikoner/Q.webp'], scale: 1.04 }
+    0: { srcs: lvSrcs('assets/figur'), scale: 1.1 },
+    4: { srcs: ['assets/ikoner/A.webp'], scale: 1 },
+    5: { srcs: ['assets/ikoner/K.webp'], scale: 1 },
+    6: { srcs: ['assets/ikoner/Q.webp'], scale: 1 }
   };
   var figImgs = {}, figSprites = {}, figBox = {};
   Object.keys(FIGS).forEach(function (s) {
@@ -476,7 +476,7 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
     var w = M.CFG.baseW, t = 0, i; for (i = 0; i < 8; i++) t += w[i];
     var u = Math.random() * t; for (i = 0; i < 8; i++) { u -= w[i]; if (u < 0) return i; } return 7;
   }
-  function Cell(sym, y) { this.sym = sym; this.y = y; this.target = y; this.vy = 0; this.delay = 0; this.win = false; this.pop = -1; this.sz = 0.84; this.winHit = null; }
+  function Cell(sym, y) { this.sym = sym; this.y = y; this.target = y; this.vy = 0; this.delay = 0; this.win = false; this.pop = -1; this.sz = 0.82; this.winHit = null; }
   function Reel(i) { this.i = i; this.mode = 'grid'; this.cells = []; this.d = 0; this.v = 0; this.t = 0; this.phase = 'idle'; this.tape = {}; this.target = null; this.stopping = false; this.landed = true; this.done = true; }
   Reel.prototype.setGrid = function (col) { this.mode = 'grid'; this.cells = col.map(function (s, y) { return new Cell(s, y); }); };
   Reel.prototype.tapeAt = function (n) { if (!(n in this.tape)) this.tape[n] = visualSym(); return this.tape[n]; };
@@ -532,9 +532,6 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
     for (var i = 0; i < this.cells.length; i++) {
       var c = this.cells[i];
       if (c.pop >= 0) c.pop += dt;
-      var yy = Math.max(0, Math.min(ROWS - 1, Math.round(c.y)));
-      var want = pos[yy * N + this.i].lv > 0 ? 0.6 : 0.84;
-      c.sz += (want - c.sz) * Math.min(1, dt * 10);
       if (c.delay > 0) { c.delay -= dt; continue; }
       if (c.y < c.target || c.vy !== 0) {
         c.vy += GRAV * dt; c.y += c.vy * dt;
@@ -656,42 +653,56 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
     }
     g.restore();
   }
+  // En ruta som i C&T: mörk ruta med symbolen stor ovanpå. I vila syns bara rutans nivå som en tunn kant i lagrets
+  // färg (inga hörn, inga siffror). Lagren visas först när de vinner: tjock ram i lagrets färg, en stor siffra i
+  // hörnet och lagrets symbol som tittar fram bakom symbolen (som C&T:s lagervinst).
   function drawPlate(g, c, time, hl) {
-    var r = c % N, row = Math.floor(c / N), x = r * cell, y = row * cell, p = pos[c], ins = cell * 0.035, w = cell - 2 * ins;
-    var anyHit = hl && (p.hit.some(Boolean) || p.topHit);
+    var r = c % N, row = Math.floor(c / N), x = r * cell, y = row * cell, p = pos[c], ins = cell * 0.03, w = cell - 2 * ins;
+    var layHit = -1;
+    for (var h = 0; h < p.hit.length; h++) if (p.hit[h] && (p.gone[h] == null)) layHit = Math.max(layHit, h);
+    var anyHit = hl && (layHit >= 0 || p.topHit);
     g.save();
     if (hl && !anyHit) g.globalAlpha = 0.35;
-    rr(g, x + ins, y + ins, w, w, cell * 0.14);
-    g.fillStyle = p.lv ? hexA(LAYC[p.lv - 1], 0.16) : '#1d1629'; g.fill();
-    g.fillStyle = 'rgba(0,0,0,.2)'; g.fill();
-    // lagerrutan: tjock ram i lagrets färg och en stor siffra i hörnet (som C&T:s lagervinst)
+    rr(g, x + ins, y + ins, w, w, cell * 0.1);
+    g.fillStyle = '#1c1826'; g.fill();
     if (p.lv) {
-      g.lineWidth = Math.max(2, cell * 0.05); g.strokeStyle = LAYC[p.lv - 1]; g.stroke();
-      var fs = Math.round(cell * 0.34);
-      g.font = fs + 'px Bangers, Impact, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
-      g.lineJoin = 'round'; g.lineWidth = cell * 0.06; g.strokeStyle = '#15111f'; g.strokeText(String(p.lv), x + cell * 0.1, y + cell * 0.06);
-      g.fillStyle = LAYC[p.lv - 1]; g.fillText(String(p.lv), x + cell * 0.1, y + cell * 0.06);
+      g.fillStyle = hexA(LAYC[p.lv - 1], 0.07); g.fill();
+      rr(g, x + ins + 1.5, y + ins + 1.5, w - 3, w - 3, cell * 0.09);
+      g.lineWidth = Math.max(1.5, cell * 0.022); g.strokeStyle = hexA(LAYC[p.lv - 1], 0.75); g.stroke();
     }
-    if (p.prev) {
-      var pk = (clock - p.prevT) / 0.3;
-      if (pk >= 1) p.prev = null;
-      else for (var q = 0; q < p.prev.slots.length; q++) drawChip(g, x, y, q, p.prev.slots[q], 1 - pk, 1 - pk * 0.4, false, false);
-    }
+    g.restore();
+    // lagervinst: lagrets symbol tittar fram i hörnet bakom symbolen (ritas före symbolen, som ett lager bakom)
     for (var i = 0; i < p.slots.length; i++) {
-      var a = 1, sc = 1, t = clock - p.slotT[i];
-      if (t >= 0 && t < 0.4) sc = easeBack(t / 0.4);
+      if (!p.hit[i] || p.slots[i] < 0) continue;
       var gk = p.gone[i] != null ? (clock - p.gone[i]) / 0.22 : -1;
       if (gk >= 1) continue;
+      var sc = 1, a = 1;
       if (gk >= 0) { sc = gk < 0.4 ? 1 + gk * 0.7 : 1.28 * (1 - (gk - 0.4) / 0.6); a = 1 - Math.max(0, gk - 0.5) * 2; }
-      var hit = !!p.hit[i];
-      if (hl && hit && gk < 0) { var wt = p.hitT != null ? time - p.hitT : -1; if (wt >= 0 && wt < 0.55) sc *= 1 + 0.25 * Math.sin(wt / 0.55 * Math.PI); }
-      drawChip(g, x, y, i, p.slots[i], a, sc, hit, hl);
+      else if (hl) { var wt = p.hitT != null ? time - p.hitT : -1; if (wt >= 0 && wt < 0.55) sc *= 1 + 0.25 * Math.sin(wt / 0.55 * Math.PI); }
+      var ms = cell * 0.5 * sc, cx = x + (CORNER[i][0] ? cell * 0.74 : cell * 0.26), cy = y + (CORNER[i][1] ? cell * 0.74 : cell * 0.26);
+      g.save(); g.globalAlpha = a; g.shadowColor = '#fff6e0'; g.shadowBlur = cell * 0.2;
+      if (sprites[p.slots[i]]) g.drawImage(sprites[p.slots[i]], cx - ms / 2, cy - ms / 2, ms, ms);
+      g.restore();
+    }
+  }
+  // Ovanpå symbolerna: lagervinstens ram och siffra, nivåringen när rutan levlar och sprickans vita blixt.
+  function drawPlateTop(g, c, time, hl) {
+    var r = c % N, row = Math.floor(c / N), x = r * cell, y = row * cell, p = pos[c], ins = cell * 0.03, w = cell - 2 * ins;
+    var layHit = -1;
+    for (var h = 0; h < p.hit.length; h++) if (p.hit[h] && p.gone[h] == null) layHit = Math.max(layHit, h);
+    if (hl && layHit >= 0) {
+      var col = LAYC[layHit], fs = Math.round(cell * 0.36);
+      g.save();
+      rr(g, x + ins, y + ins, w, w, cell * 0.1); g.lineWidth = Math.max(3, cell * 0.06); g.strokeStyle = col; g.stroke();
+      g.font = fs + 'px Bangers, Impact, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top'; g.lineJoin = 'round';
+      g.lineWidth = cell * 0.07; g.strokeStyle = '#15111f'; g.strokeText(String(layHit + 1), x + cell * 0.09, y + cell * 0.05);
+      g.fillStyle = col; g.fillText(String(layHit + 1), x + cell * 0.09, y + cell * 0.05);
+      g.restore();
     }
     var lt = clock - p.lvT;
-    if (lt >= 0 && lt < 0.6 && p.lv) { g.globalAlpha = 1 - lt / 0.6; g.lineWidth = cell * 0.06 * (1 - lt / 0.6) + 1; g.strokeStyle = LAYC[p.lv - 1]; rr(g, x + ins - lt * cell * 0.25, y + ins - lt * cell * 0.25, w + lt * cell * 0.5, w + lt * cell * 0.5, cell * 0.2); g.stroke(); g.globalAlpha = 1; }
+    if (lt >= 0 && lt < 0.6 && p.lv) { g.save(); g.globalAlpha = 1 - lt / 0.6; g.lineWidth = cell * 0.06 * (1 - lt / 0.6) + 1; g.strokeStyle = LAYC[p.lv - 1]; rr(g, x + ins - lt * cell * 0.25, y + ins - lt * cell * 0.25, w + lt * cell * 0.5, w + lt * cell * 0.5, cell * 0.18); g.stroke(); g.restore(); }
     var bt = clock - p.burstT;
-    if (bt >= 0 && bt < 0.5) { g.globalAlpha = 1 - bt / 0.5; g.fillStyle = '#fff6e0'; rr(g, x + ins, y + ins, w, w, cell * 0.14); g.fill(); g.globalAlpha = 1; }
-    g.restore();
+    if (bt >= 0 && bt < 0.5) { g.save(); g.globalAlpha = 1 - bt / 0.5; g.fillStyle = '#fff6e0'; rr(g, x + ins, y + ins, w, w, cell * 0.1); g.fill(); g.restore(); }
   }
   // Vilo-animationer: när brädet står still vaknar en symbol i taget i cirka 1,5 s (hopp och glimt, figuren nickar).
   var nextIdle = 0;
@@ -744,7 +755,7 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
     if (!pxr) return;
     g.setTransform(pxr, 0, 0, pxr, 0, 0);
     g.clearRect(0, 0, boardPx, boardPx);
-    g.fillStyle = '#100b18'; g.fillRect(0, 0, boardPx, boardPx);
+    g.fillStyle = '#121017'; g.fillRect(0, 0, boardPx, boardPx);
     var hl = state.phase === 'show';
     for (var c = 0; c < CELLS; c++) {
       var cl = reels[c % N].mode === 'grid' ? cellAt(c % N, Math.floor(c / N)) : null;
@@ -755,7 +766,7 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
       var reel = reels[r], x = r * cell;
       g.save(); g.beginPath(); g.rect(x, 0, cell, boardPx); g.clip();
       if (reel.mode === 'spin') {
-        var blur = reel.v > 9, first = Math.floor(-reel.d) - 1, stretch = blur ? 1.06 : 1, s = cell * 0.84;
+        var blur = reel.v > 9, first = Math.floor(-reel.d) - 1, stretch = blur ? 1.06 : 1, s = cell * 0.82;
         for (var n = first; n <= first + ROWS + 1; n++) {
           var sy = (n + reel.d) * cell, sym = reel.tapeAt(n), s2 = s * figScale(sym), im = blur ? blurs[sym] : sprites[sym];
           if (im) g.drawImage(im, x + (cell - s2) / 2, sy + (cell - s2 * stretch) / 2, s2, s2 * stretch);
@@ -763,6 +774,7 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
       } else for (var i = 0; i < reel.cells.length; i++) drawTop(g, reel.cells[i], x, time, hl);
       g.restore();
     }
+    for (var c2 = 0; c2 < CELLS; c2++) drawPlateTop(g, c2, time, hl);
     var bx = sweepX();
     if (hl && bx !== Infinity) {
       var grd = g.createLinearGradient(bx - cell * 0.6, 0, bx + cell * 0.2, 0);
