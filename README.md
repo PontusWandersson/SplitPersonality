@@ -1,4 +1,6 @@
-# Lagerspelet (arbetsnamn)
+# ALTER EGO
+
+Gränssnittet följer UI-basen från C&T Maniac: `docs/ui-bas/UI-bas C&T Maniac.md` (kopierad från C&T-mappen 2026-11-10, med skärmbilderna). Platserna står i tabellen `POS` i `prototyp.html`.
 
 En 7x7-slot med klungvinster, där rutorna levlar upp i lavinerna. En levlad ruta rymmer fler symboler och räknas som fler rutor i klungan. Temat är inte bestämt.
 
