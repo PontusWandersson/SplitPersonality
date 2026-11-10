@@ -3029,7 +3029,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     <div class="dlg-body">
       <div class="menu-list">
         <button class="mitem" type="button" id="mInfo">Regler och vinsttabell <span aria-hidden="true">›</span></button>
-        <button class="mitem" type="button" id="mGuide">Så funkar spelet <span aria-hidden="true">›</span></button>
+        <button class="mitem" type="button" id="mGuide" hidden>Så funkar spelet <span aria-hidden="true">›</span></button>
         <label class="mitem">Ljudeffekter <input type="checkbox" id="optSfx"></label>
         <label class="mitem">Musik <input type="checkbox" id="optMusic"></label>
         <label class="mitem">Turbo <input type="checkbox" id="optTurbo"></label>
@@ -3381,13 +3381,16 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   // varje ruta (0 = ingen), LADU = upplåsta lager (infAt = INFINITY; 99 = alla, utanför INFINITY-bonusen), LADC =
   // lagervinster mot nästa lager, LADX = hur många lagervinster ett steg kräver (0 = ingen stege).
   var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;
+  // ALTER EGO: inga lager (tools/make-ct-bas.js, NOLAYER). Vinsterna når aldrig förra snurret, lagren eller INFINITY
+  // (minCur 99), inga lagerkast, ingen kassett vid bonusstart, ingen INFINITY, ingen stege och multin står på x1.
+  TIME.minCur = 99; TIME.layerTedP = 0; TIME.layerCarlaP = 0; TIME.infVals = null; TIME.fsLad = false;
+  TIME.fsPrefill = false; TIME.maniacPrefill = false; TIME.fsLayersDraw = null; TIME.maniacLayersDraw = null;
+  TIME.fsStartDraw = null; TIME.maniacStartDraw = null; TIME.fsStart = 1; TIME.maniacStart = 1;
   // ALTER EGO: AE = { s: steg, c: symboler mot nästa steg } för Killen, Katten och Växten (bara i superbonusen)
   TIME.alterEgo = true;
   // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)
-  TIME.scale = 0.10713; TIME.fsScale = 0.08228; TIME.maniacScale = 0.5195;
+  TIME.scale = 0.4338; TIME.fsScale = 3.649; TIME.maniacScale = 23.05;
   var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_NEED = 5, AE = null;
-  function aeLim(s) { if (!AE) return LADU; var ci = AE_CH[s]; return ci == null ? 1 : AE.s[ci] >= 5 ? 99 : AE.s[ci]; }
-  function aeInf(s) { if (!AE) return LADU >= (TIME.infAt || 6); var ci = AE_CH[s]; return ci != null && AE.s[ci] >= 5; }
   // LADCAP: det högsta steget stegen kan nå (INFINITY-bonusen: infAt, Bonusspelet: fsDepth)
   function ladNeed(u) { return Array.isArray(LADX) ? LADX[Math.min(u, LADX.length) - 1] : LADX; }
   // talen i ett bräde som faller in i INFINITY: infP av rutorna får ett tal ur infVals (två slumptal per ruta som får tal)
@@ -3403,8 +3406,8 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
         var hit = { rows: [], weight: 0, top: 1 }, d = 0;
         scanReel(grid, r, s, hit);
         if (!hit.rows.length && r >= TIME.minCur) {
-          for (var k = 0; k < Math.min(layers.length, aeLim(s)) && !hit.rows.length; k++) { threadCell(layers[k], r, s, from, hit); if (hit.rows.length) d = k + 1; }
-          if (!hit.rows.length && INFB && aeInf(s)) for (var ib = 0; ib < INFB.length && !hit.rows.length; ib++) {
+          for (var k = 0; k < Math.min(layers.length, LADU) && !hit.rows.length; k++) { threadCell(layers[k], r, s, from, hit); if (hit.rows.length) d = k + 1; }
+          if (!hit.rows.length && INFB && LADU >= (TIME.infAt || 6)) for (var ib = 0; ib < INFB.length && !hit.rows.length; ib++) {
             threadCell(INFB[ib], r, s, from, hit);
             if (hit.rows.length) { d = layers.length + 1 + ib; var iv = INFV[ib][r][hit.rows[0]]; if (iv > 0) icl.push({ r: r, y: hit.rows[0], v: iv }); }
           }
@@ -3611,8 +3614,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     // INFINITY-bonusen: tom INFINITY, och stegen börjar på så många lager som kassetten spolade (lad0)
     INFB = maniac && TIME.infVals ? [] : null; INFV = INFB ? [] : null; LADX = INFB && TIME.ladX ? TIME.ladX : !maniac && TIME.fsLad && TIME.ladX ? TIME.ladX : 0;
     LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;
-    AE = maniac && INFB && TIME.alterEgo ? { s: [1, 1, 1], c: [0, 0, 0] } : null;
-    if (AE) { LADX = 0; LADU = 99; lad0 = LADU; }
+    AE = maniac && TIME.alterEgo ? { s: [1, 1, 1], c: [0, 0, 0] } : null;
     while (INFB && layers.length > depth) { INFB.push(layers.pop()); INFV.push(INFB[INFB.length - 1].map(infDraw(rng))); }
     var startMult = mult, layers0 = layers.slice();
     while (left > 0 && x0 + x < TIME.maxX) {
@@ -4061,13 +4063,13 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     'Belopp per vinstväg vid insatsen {b}. Lika symboler räknas från hjulet längst till vänster, på hjul i rad, på vilken rad som helst.': 'Amount per way at the bet {b}. Matching symbols count from the leftmost reel, on adjacent reels, on any row.',
     'Symbol': 'Symbol',
     '<b>Wild</b> finns på hjul 2–6 och ersätter alla symboler utom bonusbomben.': '<b>Wild</b> appears on reels 2–6 and substitutes for all symbols except the bonus bomb.',
-    '<b>Bonusbomben</b>: 3 eller fler bomber var som helst på brädet när lavinerna är slut ger {n} frispinn. Blir en av bomberna guld startar Infinity-bonusen i stället. 3 bomber eller fler i ett frispinn ger {r} frispinn till.':
+    '<b>Bonusbomben</b>: 3 eller fler bomber var som helst på brädet när lavinerna är slut ger {n} frispinn. Blir en av bomberna guld startar ALTER EGO i stället. 3 bomber eller fler i ett frispinn ger {r} frispinn till.':
       '<b>The bonus bomb</b>: 3 or more bombs anywhere on the board when the cascades are over give {n} free spins. If one of the bombs turns gold, the Infinity Bonus starts instead. 3 or more bombs in a free spin give {r} more free spins.',
     'Väggen har {d} lager bakåt. Saknas symbolen på brädet hämtas den från närmaste lager bakåt som har den (siffran vid hörnet visar hur långt bakåt).': 'The wall has {d} layers back. If the symbol is missing on the board, it is taken from the nearest layer back that has it (the number at the corner shows how far back).',
     'I Bonusspelet är vinsterna vinsttabellen gånger {s}, och sedan gånger multin.': 'In the Bonus Game, wins are the paytable times {s}, then times the multi.',
     'Köp: {n} frispinn direkt för {x} gånger insatsen. Köpt Bonusspel ger i snitt {p} tillbaka.': 'Buy: {n} free spins now for {x} times the bet. A bought Bonus Game returns {p} on average.',
     'Infinity-bonus': 'Infinity Bonus',
-    'Guldbomben: landar 5 eller fler bomber när hjulen stannar blir den sista bomben guld. Landar exakt 4 blir den sista guld i {p} av fallen. Guldbomben startar Infinity-bonusen med {n} frispinn.':
+    'Guldbomben: landar 5 eller fler bomber när hjulen stannar blir den sista bomben guld. Landar exakt 4 blir den sista guld i {p} av fallen. Guldbomben startar ALTER EGO med {n} frispinn.':
       'The gold bomb: if 5 or more bombs land when the reels stop, the last bomb turns gold. If exactly 4 land, the last one turns gold in {p} of cases. The gold bomb starts the Infinity Bonus with {n} free spins.',
     'Djupare tid: väggen har {d} lager bakåt. Saknas symbolen på brädet hämtas den från närmaste lager bakåt som har den, upp till {d} snurr (siffran vid hörnet visar hur långt bakåt).':
       'Deeper time: the wall has {d} layers back. If the symbol is missing on the board, it is taken from the nearest layer back that has it, up to {d} spins (the number at the corner shows how far back).',
@@ -5357,8 +5359,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     init: function () {
       // pausad ('suspended') eller avbruten av telefonen ('interrupted' på iPhone, till exempel när skärmen släcktes)
       if (this.ctx) { if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume(); return; }
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
+      return;   // ALTER EGO: inget ljud
       try { this.ctx = new AC(); } catch (e) { return; }
       var c = this.ctx, comp = c.createDynamicsCompressor(), self = this;
       // stannar ljudet medan sidan syns (telefonen tog ljudet, ett samtal, hörlurar som kopplades ur) startas det igen
@@ -6734,7 +6735,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   function takeGhost() { return curWall()[0].map(function (c) { return c.slice(); }); }
   function showGhost(res) {
     var any = res.ghostIn && res.ghostIn.some(function (col) { return col.some(function (sym) { return sym >= 0; }); });
-    ghostView = any ? { grid: res.ghostIn.map(function (col) { return col.slice(); }), t0: clock, out: null } : null;
+    ghostView = null;   // ALTER EGO: inga lager, inga rivna hörn
     timeFx = null;
     hideTimeCap();
   }
@@ -9109,7 +9110,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
           [1, 2, 3].map(function (k) { return '<i class="ly l' + k + (k === 1 ? ' on' : '') + '"><span>layer</span><em>' + k + '</em></i>'; }).join('') + '</div>';
         el.meterFs.parentNode.appendChild(bl);
       }
-      bl.hidden = false;
+      bl.hidden = true;   // ALTER EGO: ingen LAYERSPINS-panel
     } else if (bl) bl.hidden = true;
     if (fs) {
       el.fsLeft.textContent = fs.left;
@@ -12227,7 +12228,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     if (ft >= 0.5) gBurst(g, tx + s / 2, ty + s * 0.8, gSeg(u, 5.6, 6.1), 60, ['#ffffff', '#dfe6ee', '#ffd21f']);
   }
   // ---- bonusaffischen
-  var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. Steget är hur många LAYER karaktären når. <b>Steg 5 = ALTER EGO</b> når <b class="inf-word">INFINITY</b></p>';
+  var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. <b>Steg 5 = ALTER EGO</b></p>';
   // det högsta talet står med (användaren 2026-10-30: "det framgår högsta multin"); {m} = störst i M.TIME.infVals (infTop)
   var INF_RULE = '<p><b class="inf-word">INFINITY</b> letar hur långt tillbaka som helst. Vissa rutor har ett tal <b>upp till x{m}</b> som gångrar vinsten</p>';
   function infTop() { return Math.max.apply(null, M.TIME.infVals || [0]); }
@@ -13534,13 +13535,12 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   // resume (avbruten omgång): { si: antal frispinn som redan är visade, total: bonusens vinst hittills }
   // ================================================================ ALTER EGO (superbonusen)
   // Förs in i C&T-koden av tools/make-ct-bas.js (före runFreeSpins), så allt i C&T:s spelkod går att använda här.
-  // Superbonusen är C&T:s INFINITY-bonus (guldbomben eller köp i ODD-menyn) med en ändring: Killen, Katten och Växten har
-  // var sitt steg 1–5 (matten: AE i spelmotorn). Steget avgör hur många lager karaktärens vinster når (steg 1 = LAYER 1,
-  // steg 4 = LAYER 1–4) och steg 5, ALTER EGO, når alla lager och INFINITY. 5 karaktärssymboler i vinster (brädet och lagren) ger nästa steg. Andra
-  // symboler når bara LAYER 1. Multin växer med lagrets siffra som i C&T (LAYER 3 = +3) och nollställs aldrig.
+  // Superbonusen kommer som C&T:s superbonus (guldbomben eller köp). Killen, Katten och Växten har var sitt steg 1–5 (matten:
+  // AE i spelmotorn): 5 karaktärssymboler i vinster ger nästa steg, och steg 5 heter ALTER EGO. Stegen styr inga lager
+  // (lagren är borttagna och byggs om, Pontus 2026-11-10); karaktären byter bara bild.
   // Här: bilderna per steg (alla karaktärer på brädet byter bild), panelen med karaktärerna och LEVEL UP.
   var AE_SYM = [2, 3, 4], AE_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN'];
-  var AE_LCOL = ['#2fb4ff', '#3ccf6e', '#ff2d4f', '#d23cff', '#ffd21f'];   // lagrens färger (LAYER 1–5), som C&T
+  var AE_PIP = '#ff8629', AE_PIP_MAX = '#ffd21f';   // stegens färg (orange accent) och ALTER EGO (gul)
   // Pontus fem bilder per karaktär (steg 1–5); steg 1 är samma bild som symbolen i grundspelet
   var AE_SRC = {
     2: [0, 1, 2, 3, 4].map(function (k) { return 'assets/figur/lv' + k + '.webp'; }),
@@ -13623,17 +13623,11 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     for (var i = 0; i < 3; i++) {
       var k = ae.s[i], row = rows[i], img = row.querySelector('img'), src = AE_SRC[AE_SYM[i]][k - 1];
       if (img.getAttribute('src') !== src) img.setAttribute('src', src);
-      row.querySelector('.ae-step').textContent = k >= 5 ? 'ALTER EGO · INFINITY' : 'STEG ' + k + ' · LAYER ' + (k === 1 ? '1' : '1–' + k);
-      row.querySelectorAll('.ae-pips i').forEach(function (p, j) { p.style.background = j < k ? AE_LCOL[j] : ''; });
+      row.querySelector('.ae-step').textContent = k >= 5 ? 'ALTER EGO' : 'STEG ' + k + ' AV 5';
+      row.querySelectorAll('.ae-pips i').forEach(function (p, j) { p.style.background = j < k ? (k >= 5 ? AE_PIP_MAX : AE_PIP) : ''; });
       row.querySelectorAll('.ae-wins i').forEach(function (p, j) { p.classList.toggle('on', k < 5 && j < ae.c[i]); });
       row.classList.toggle('max', k >= 5);
       if (up && up.indexOf(i) >= 0) { row.classList.remove('up'); void row.offsetWidth; row.classList.add('up'); }
-    }
-    // C&T:s lagerstege visar hur djupt den bästa karaktären når; steg 5 öppnar INFINITY
-    if (state.fs) {
-      var top = Math.max(ae.s[0], ae.s[1], ae.s[2]);
-      state.fs.ladU = top >= 5 ? infD() : top; state.fs.ladC = 0;
-      try { renderMeter(); } catch (e) { /* mätaren ritas nästa gång */ }
     }
   }
   function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeSprites([1, 1, 1]); aeRender({ s: [1, 1, 1], c: [0, 0, 0] }); }
@@ -13654,10 +13648,6 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       fx.innerHTML = '<div class="ae-card' + (k >= 5 ? ' max' : '') + '"><img alt="" src="' + AE_SRC[AE_SYM[i]][k - 1] + '"><b>' +
         (k >= 5 ? AE_NAMN[i] + ' · ALTER EGO!' : AE_NAMN[i] + ' · STEG ' + k) + '</b></div>';
       (document.getElementById('frame') || document.body).appendChild(fx);
-      try {
-        Sound.tone(392, 0.16, { type: 'triangle', vol: 0.12 }); Sound.tone(523, 0.16, { type: 'triangle', vol: 0.12, when: 0.1 });
-        Sound.tone(k >= 5 ? 1046 : 784, 0.32, { type: 'triangle', vol: 0.12, when: 0.2 });
-      } catch (e) { /* inget ljud */ }
       await wait(showTime(k >= 5 ? 1.6 : 1.1));
       fx.remove();
     }
@@ -13666,7 +13656,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   async function runFreeSpins(count, bought, maniac, plan, resume) {
     // i Tidsvägar har båda bonusarna lager bakåt (depth): Bonusspel fsDepth, Maniac maniacDepth
     state.fs = { left: count, mult: maniac ? M.TIME.maniacStart : M.TIME.fsStart, total: 0, maniac: !!maniac, layers: null,
-      depth: maniac ? M.TIME.maniacDepth : M.TIME.fsDepth };
+      depth: 0 };   // ALTER EGO: inga lager i bonusarna
     // Maniac med startmulti per lager (prototypen, M.TIME.maniacStartDraw): multin börjar på 0 och inga lager är tända,
     // kassetten fyller lagren och räknar upp multin (maniacTape) före första frispinnet
     var tape = plan.startDraws; state.fs.plan = plan;
@@ -13694,15 +13684,8 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       typeof bonusIntroImageOn === 'function' && bonusIntroImageOn(!!maniac) ? bonusIntroImageHtml({ maniac: !!maniac, bought: !!bought, resuming: !!resuming, count: count, left: state.fs.left, auto: state.auto > 0 }) :
       '<span class="ov-kicker">' + (resuming ? txl('Bonusen fortsätter') : bought ? txl('Köpt bonus') : 'Bonus') + '</span><h2 class="ov-title">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL')) + '</h2>' +
       '<div class="ov-big">' + (resuming ? txl('{n} frispinn kvar', { n: state.fs.left }) : txl('{n} frispinn', { n: count })) + '</div>' +
-      // Tidsvägar: reglerna i korta, stora rader (multin, hur långt bakåt vinsterna når, med lagerbrickorna, och bomberna),
-      // likadant i båda bonusarna, bara siffrorna skiljer sig. 3 bomber ger +3 frispinn i båda bonusarna
-      // (samma som playBonus i math.js).
-      '<div class="cv-facts">' + (tape && !resuming && mtLD(!!maniac) ? txl('<p>Kassetten spolar fram <b>{n} LAYER</b>. Varje LAYER ger <b class="nw">LAYER-numret × {x}</b> i MULTI, och allt läggs ihop</p>', { n: mtLayersText(!!maniac), x: mtStep(!!maniac) })
-        : txl('<p><b>MULTI x{m}</b> nollställs aldrig</p>', { m: tape && !resuming ? mtRange(!!maniac) : state.fs.mult })) +
-        (infMn(maniac) ? txl(INF_LADDER) : M.TIME.fsLad ? txl('<p><b>3 lagervinster</b> öppnar nästa LAYER</p>') : txl('<p>Vinster hämtar symboler <b>upp till {d} snurr bakåt</b></p>', { d: state.fs.depth })) + '</div>' +
-      // prototypen (kassetten): under varje LAYER-bricka vad lagret ger i multi (LAYER 1 = x6, LAYER 2 = x12 … i Maniac)
-      (state.fs.depth ? '<div class="cv-layers' + (tape && !resuming && mtSeq(!!maniac) ? ' cv-tape' : '') + (infMn(maniac) ? ' cv-inf' : '') + '">' + [1, 2, 3, 4, 5].slice(0, state.fs.depth).map(function (k) { return '<i class="ly l' + k + '"><span>layer</span><em>' + k + '</em>' + (tape && !resuming && mtSeq(!!maniac) ? '<b class="ly-x">x' + mtSD(!!maniac).v[k - 1] + '</b>' : '') + '</i>'; }).join('') + (infMn(maniac) ? infChipHtml() : '') + '</div>' : '') +
-      '<div class="cv-facts">' + (infMn(maniac) ? txl('<p>Vinst från ett lager höjer multin med lagrets siffra: <b>LAYER 3 = +3</b></p>') + txl(INF_RULE, { m: infTop() }) + txl('<p><b>3 BOMBER</b> = +{n} frispinn</p>', { n: 3 }) : txl('<p>Vinst från ett lager höjer multin med lagrets siffra: <b>LAYER 3 = +3</b></p><p><b>3 BOMBER</b> = +{n} frispinn</p>', { n: maniac ? 3 : M.FS_RETRIGGER })) + '</div>' +
+      // ALTER EGO: inga lager, så bara karaktärerna (superbonusen) och bomberna
+      '<div class="cv-facts">' + (maniac && M.TIME.alterEgo ? txl(INF_LADDER) : '') + txl('<p><b>3 BOMBER</b> = +{n} frispinn</p>', { n: maniac ? 3 : M.FS_RETRIGGER }) + '</div>' +
       // ingen knapp, samma text som överallt (ett klick var som helst startar bonusen, cover-overlay.js)
       ('<p class="ov-tap"><span class="tap-go">' + txl('Klicka var som helst för att fortsätta') + '</span></p>') + (state.auto > 0 ? ('<span class="ov-auto">' + txl('Startar automatiskt') + '</span>') : ''),
       { autoMs: state.auto > 0 ? 3000 : 0, cover: true, bomb: !resuming && !state.turbo, maniac: !!maniac, under: fsOn, foldSound: true, foldCols: maniac ? ['#ffd21f', '#e8202e', '#b45cff', '#fff6e0'] : ['#ff750c', '#b45cff', '#4fd6e8', '#fff6e0'] }
@@ -14079,7 +14062,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     }
     return ('<span class="ov-kicker">' + txl('Köp bonus') + '</span><h2 class="ov-title">' + txl('Välj bonus') + '</h2><div class="bm-row">') +
       card('b1', '', txl('Bonusspel'), M.fsAwardTime(3), BUY_X) +
-      card('b2', 'mn', 'INFINITY<small>BONUS</small>', M.TIME.maniacSpins, M.TIME.maniacBuy) +
+      card('b2', 'mn', 'ALTER EGO<small>BONUS</small>', M.TIME.maniacSpins, M.TIME.maniacBuy) +
       '</div>' + modesHtml() + '<div class="bm-bet"><span>' + txl('Insats') + ('</span><button type="button" class="bm-down" aria-label="' + txl('Sänk insatsen') + '">−</button><b class="bm-bv">') + money(bet()) + ('</b><button type="button" class="bm-up" aria-label="' + txl('Höj insatsen') + '">+</button></div>') +
       ('<div class="ov-btns"><button class="ov-go alt" type="button" data-v="no">' + txl('STÄNG') + '</button></div>');
   }
@@ -14096,8 +14079,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     }
     return '<div class="bm-modes"><div class="bm-mrow">' +
       btn('hunt', '', 'BONUS<br>HUNT', txl('Bonusspelet kommer oftare')) +
-      btn('inf', 'mn', 'INFINITY<br>HUNT', txl('Varje bonus blir INFINITY')) +
-      btn('lay3', 'ly', '3<br>LAYERS', txl('LAYER 1–3 i varje snurr')) + '</div></div>';
+      btn('inf', 'mn', 'ALTER EGO<br>HUNT', txl('Varje bonus blir ALTER EGO')) + '</div></div>';
   }
   function wireBuyMenu(o) {
     if (!o) return;
@@ -14224,9 +14206,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       { t: txl('Fler vägar'), x: txl('Två K på samma hjul ger två vinstvägar: 1 × 2 × 1 × 1 = 2 vägar på 4 hjul.'),
         b: [[A, K, J], [K, Q, K], [J, K, B], [K, S, A], [Q, J, S], [B, A, Q]], w: [[0, 1], [1, 0], [1, 2], [2, 1], [3, 0]] },
       { t: 'Wild', x: txl('Wild finns på hjul 2–6 och ersätter alla symboler utom bonusbomben.'),
-        b: [[Q, K, A], [J, WILD, S], [K, A, Q], [B, J, K], [S, Q, J], [A, Y, B]], w: [[0, 1], [1, 1], [2, 0], [3, 2]] },
-      { t: 'Layerspins', x: txl('Saknas symbolen på nästa hjul kan förra snurrets symbol i det rivna hörnet fylla luckan, och vinsten fortsätter.'),
-        b: [[K, A, J], [Q, K, S], [A, J, K], [J, Q, A], [K, S, Q], [B, A, J]], w: [[0, 0], [1, 1], [2, 2], [3, 1], [4, 0]], c: { r: 3, y: 1, sym: K } }
+        b: [[Q, K, A], [J, WILD, S], [K, A, Q], [B, J, K], [S, Q, J], [A, Y, B]], w: [[0, 1], [1, 1], [2, 0], [3, 2]] }
     ];
     var cards = ex.map(function (e) {
       return '<div class="wb-card"><b class="wb-title">' + e.t + '</b>' + waysBoard(e.b, e.w, e.c) + '<p>' + e.x + '</p></div>';
@@ -14298,52 +14278,35 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     }
     // texterna skrivs på svenska; engelskan står i lang-en.js (txl)
     var autoList = (function () { var a = AUTO_COUNTS.filter(function (n) { return n <= MARKET.autoMax; }); return a.slice(0, -1).join(', ') + txl(' eller ') + a[a.length - 1]; })();
-    var fsRule = '<li>' + mtRuleText(false) + '</li>' +
-      '<li>' + txl('Multin gäller för hela vinststeget. Efter steget ökar den för varje hörn i vinsterna: +1 för ett snurr bakåt, +2 för två och +3 för tre. Den nollställs aldrig under bonusen.') + '</li>';
-    var mnGrow = '<li>' + txl('Efter varje vinststeg ökar multin med lika mycket som hörnen ligger bakåt, från +1 till +{d}. Multin nollställs aldrig.', { d: M.TIME.maniacDepth }) + '</li>';
-    if (M.TIME.infVals) mnGrow += infRulesExtra();
-    var mnRule = '<li>' + mtRuleText(true) + '</li>' + mnGrow;
+    var fsRule = '', mnRule = '<li>' + txl('Killen, Katten och Växten levlar var för sig: 5 karaktärssymboler i vinster ger nästa steg. Karaktären byter bild för varje steg, och steg 5 heter ALTER EGO.') + '</li>';
     $('#infoBody').innerHTML =
       '<section><h3>' + txl('Fakta om spelet') + '</h3><div class="facts">' +
       '<div class="fact"><span>' + txl('Återbetalning (RTP)') + '</span><b>' + percent(96.0) + '</b></div>' +
       '<div class="fact"><span>' + txl('RTP köpt Bonusspel') + '</span><b>' + BUY_RTP + '</b></div>' +
-      '<div class="fact"><span>' + txl('RTP köpt Infinity') + '</span><b>' + BUY_RTP_MN + '</b></div>' +
+      '<div class="fact"><span>' + txl('RTP köpt ALTER EGO') + '</span><b>' + BUY_RTP_MN + '</b></div>' +
       '<div class="fact"><span>' + txl('Maxvinst') + '</span><b>' + fmtX(M.TIME.maxX) + 'x</b></div>' +
       ('<div class="fact fact-vol"><span>' + txl('Volatilitet') + '</span><div class="fv-row">' + volMeterHtml(VOL_LEVEL).replace('class="vm"', 'class="vm vm-go"') + '<b>' + VOL_NAMES[VOL_LEVEL] + ' ' + VOL_LEVEL + '/5</b></div></div>') +
       '<div class="fact"><span>' + txl('Vinstvägar') + '</span><b>' + num(Math.pow(ROWS, REELS)) + '</b></div>' +
       '</div><p class="note" style="margin-top:8px">' + txl('Siffrorna kommer från simuleringar av 100 miljoner spelomgångar och 1 miljon köp av varje bonus (spelmotor 1.1.0, preliminärt tills certifieringskörningen är gjord). Återbetalningen är ett teoretiskt snitt över väldigt många spelomgångar.') + '</p></section>' +
       // så vinner du: små bräden med spelets symboler (info-ways.js)
       '<section><h3>' + txl('Så vinner du') + '</h3>' + waysHtml() + '</section>' +
-      '<section><h3>Layerspins</h3><ul>' +
-      '<li>' + txl('Varje ny symbol är en affisch över förra snurrets symbol, som syns i ett rivet hörn.') + '</li>' +
-      '<li>' + txl('Har en vinst gått minst två hjul och nästa hjul saknar symbolen, kan förra snurrets symbol i hörnet fylla luckan. Vinsten fortsätter sedan i förra snurret så länge symbolen finns där och byter tillbaka till brädet när den saknas, ända till hjul 6. Wilds räknas på båda ställena.') + '</li>' +
-      '<li>' + txl('I förra snurret räknas en ruta per hjul: den med symbolen som ligger närmast raden innan, annars närmaste wild.') + '</li>' +
-      '<li>' + txl('En symbol från förra snurret som har använts i en vinst försvinner och kan inte användas igen. Resten finns kvar i alla laviner i samma snurr.') + '</li>' +
-      '<li>' + txl('Kassetten: före snurret spolar kassetten ibland tillbaka 2 snurr, och då kan symboler från upp till två snurr bakåt fylla luckor. Ibland spolar den 3 snurr: upp till tre snurr bakåt. På varje hjul används brädet först och sedan närmaste lager bakåt som har symbolen. Ingen multi i grundspelet.') + '</li>' +
-      '<li>' + txl('Väggen med de tre senaste brädena sparas mellan snurren och finns kvar när du kommer tillbaka. Byter du insats ligger brädet kvar, men väggen börjar om: nästa snurr har inget förra snurr att hämta symboler från.') + '</li></ul></section>' +
       '<section><h3>' + txl('Vinsttabell') + '</h3><p>' + txl('Belopp per vinstväg vid insatsen {b}. Lika symboler räknas från hjulet längst till vänster, på hjul i rad, på vilken rad som helst.', { b: money(b) }) + '</p>' +
       '<div class="paytable-wrap"><table class="paytable"><thead><tr><th>' + txl('Symbol') + '</th><th>' + txl('{n} hjul', { n: 3 }) + '</th><th>' + txl('{n} hjul', { n: 4 }) + '</th><th>' + txl('{n} hjul', { n: 5 }) + '</th><th>' + txl('{n} hjul', { n: 6 }) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
       '<section><h3>Wild</h3><div class="sym-rule"><img src="' + icon(WILD) + '" alt=""><p>' + txl('<b>Wild</b> finns på hjul 2–6 och ersätter alla symboler utom bonusbomben.') + '</p></div></section>' +
       '<section><h3>' + txl('Bonusspel') + '</h3>' +
-      '<div class="sym-rule"><img src="' + icon(SCAT) + '" alt=""><p>' + txl('<b>Bonusbomben</b>: 3 eller fler bomber var som helst på brädet när lavinerna är slut ger {n} frispinn. Blir en av bomberna guld startar Infinity-bonusen i stället. 3 bomber eller fler i ett frispinn ger {r} frispinn till.', { n: M.fsAwardTime(3), r: M.FS_RETRIGGER }) + '</p></div><ul style="margin-top:10px">' +
-      '<li>' + (M.TIME.fsLad ? txl('Stegen: kassetten öppnar så många LAYER som den spolar. Därefter öppnar 3 vinster som hämtar en symbol ur det översta öppna lagret nästa LAYER (från nästa lavinsteg), upp till LAYER {d}. Saknas symbolen på brädet hämtas den från närmaste öppna lager bakåt som har den (siffran vid hörnet visar hur långt bakåt).', { d: M.TIME.fsDepth })
-        : txl('Väggen har {d} lager bakåt. Saknas symbolen på brädet hämtas den från närmaste lager bakåt som har den (siffran vid hörnet visar hur långt bakåt).', { d: M.TIME.fsDepth })) + '</li>' +
-      // prototypen: samma kassett som i Maniac (M.TIME.fsStartDraw)
+      '<div class="sym-rule"><img src="' + icon(SCAT) + '" alt=""><p>' + txl('<b>Bonusbomben</b>: 3 eller fler bomber var som helst på brädet när lavinerna är slut ger {n} frispinn. Blir en av bomberna guld startar ALTER EGO i stället. 3 bomber eller fler i ett frispinn ger {r} frispinn till.', { n: M.fsAwardTime(3), r: M.FS_RETRIGGER }) + '</p></div><ul style="margin-top:10px">' +
       fsRule +
       '<li>' + txl('I Bonusspelet är vinsterna vinsttabellen gånger {s}, och sedan gånger multin.', { s: fmtScale(M.TIME.fsScale) }) + '</li>' +
       '<li>' + txl('Köp: {n} frispinn direkt för {x} gånger insatsen. Köpt Bonusspel ger i snitt {p} tillbaka.', { n: M.fsAwardTime(3), x: BUY_X, p: BUY_RTP }) + '</li></ul></section>' +
-      '<section><h3>' + txl('Infinity-bonus') + '</h3><ul>' +
-      '<li>' + txl('Guldbomben: landar 5 eller fler bomber när hjulen stannar blir den sista bomben guld. Landar exakt 4 blir den sista guld i {p} av fallen. Guldbomben startar Infinity-bonusen med {n} frispinn.', { p: percent(M.TIME.goldP * 100), n: M.TIME.maniacSpins }) + '</li>' +
-      '<li>' + (M.TIME.infVals ? infRuleLadder() : txl('Djupare tid: väggen har {d} lager bakåt. Saknas symbolen på brädet hämtas den från närmaste lager bakåt som har den, upp till {d} snurr (siffran vid hörnet visar hur långt bakåt).', { d: M.TIME.maniacDepth })) + '</li>' +
-      // prototypen: alla lager fyllda från start och startmulti per lager (M.TIME.maniacStartDraw)
+      '<section><h3>ALTER EGO</h3><ul>' +
+      '<li>' + txl('Guldbomben: landar 5 eller fler bomber när hjulen stannar blir den sista bomben guld. Landar exakt 4 blir den sista guld i {p} av fallen. Guldbomben startar ALTER EGO med {n} frispinn.', { p: percent(M.TIME.goldP * 100), n: M.TIME.maniacSpins }) + '</li>' +
       mnRule +
-      '<li>' + txl('I Infinity-bonusen är vinsterna vinsttabellen gånger {s}, och sedan gånger multin. 3 bomber eller fler ger 3 frispinn till.', { s: fmtScale(M.TIME.maniacScale) }) + '</li>' +
-      '<li>' + txl('Köp: Infinity-bonusen för {x} gånger insatsen. Köpt Infinity-bonus ger i snitt {p} tillbaka.', { x: M.TIME.maniacBuy, p: BUY_RTP_MN }) + '</li></ul></section>' +
+      '<li>' + txl('I ALTER EGO är vinsterna vinsttabellen gånger {s}, och sedan gånger multin. 3 bomber eller fler ger 3 frispinn till.', { s: fmtScale(M.TIME.maniacScale) }) + '</li>' +
+      '<li>' + txl('Köp: ALTER EGO för {x} gånger insatsen. Köpt ALTER EGO ger i snitt {p} tillbaka.', { x: M.TIME.maniacBuy, p: BUY_RTP_MN }) + '</li></ul></section>' +
       // lägena i ODD-menyn (användaren 2026-11-10)
       '<section><h3>' + txl('Lägen i ODD-menyn') + '</h3><ul>' +
       '<li>' + txl('BONUS HUNT: grundhjulen har fler bomber, så Bonusspelet kommer oftare. Ett snurr kostar {x} gånger insatsen. Återbetalning {p}.', { x: num(M.MODES.hunt.price), p: percent(MODE_RTP.hunt) }) + '</li>' +
-      '<li>' + txl('INFINITY HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir Infinity-bonusen. Ett snurr kostar {x} gånger insatsen. Återbetalning {p}.', { x: num(M.MODES.inf.price), p: percent(MODE_RTP.inf) }) + '</li>' +
-      '<li>' + txl('3 LAYERS: varje snurr spelas med LAYER 1–3 (de tre senaste brädena), utan kassetten. Ett snurr kostar {x} gånger insatsen. Återbetalning {p}.', { x: num(M.MODES.lay3.price), p: percent(MODE_RTP.lay3) }) + '</li>' +
+      '<li>' + txl('ALTER EGO HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir ALTER EGO. Ett snurr kostar {x} gånger insatsen. Återbetalning {p}.', { x: num(M.MODES.inf.price), p: percent(MODE_RTP.inf) }) + '</li>' +
       '<li>' + txl('Vinsterna räknas i gånger insatsen som vanligt. Ett läge gäller varje snurr tills det stängs av i ODD-menyn, och bara ett läge kan vara på åt gången.') + '</li></ul></section>' +
       '<section><h3>' + txl('Lavin och multiplikator') + '</h3><ul>' +
       '<li>' + txl('Vinnande symboler sprängs och nya faller ner. Det fortsätter så länge det blir nya vinster.') + '</li>' +
@@ -16998,7 +16961,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     L.classList.add('ld-js');
     // Layerspins-märket under spelets namn (ls-brand.js), med eget intro när namnet har kommit
     var lsEl = null;
-    { lsEl = document.createElement('div'); lsEl.className = 'ld-ls'; lsEl.innerHTML = lsLockupHtml(); var lg0 = L.querySelector('.ld-game'); if (lg0) lg0.appendChild(lsEl); else lsEl = null; }
+    { lsEl = null; }   // ALTER EGO: inget LAYERSPINS-märke
     // introts sida har tonat in: lagret blir genomskinligt och bara stapeln syns
     setTimeout(function () { if (loaderEl) loaderEl.classList.add('ld-clear'); }, 360);
     var n = loadTasks.length, nDone = 0, all = false, loaded = false, ready = false, last = 0;

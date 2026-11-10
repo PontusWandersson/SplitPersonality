@@ -1,12 +1,11 @@
   // ================================================================ ALTER EGO (superbonusen)
   // Förs in i C&T-koden av tools/make-ct-bas.js (före runFreeSpins), så allt i C&T:s spelkod går att använda här.
-  // Superbonusen är C&T:s INFINITY-bonus (guldbomben eller köp i ODD-menyn) med en ändring: Killen, Katten och Växten har
-  // var sitt steg 1–5 (matten: AE i spelmotorn). Steget avgör hur många lager karaktärens vinster når (steg 1 = LAYER 1,
-  // steg 4 = LAYER 1–4) och steg 5, ALTER EGO, når alla lager och INFINITY. 5 karaktärssymboler i vinster (brädet och lagren) ger nästa steg. Andra
-  // symboler når bara LAYER 1. Multin växer med lagrets siffra som i C&T (LAYER 3 = +3) och nollställs aldrig.
+  // Superbonusen kommer som C&T:s superbonus (guldbomben eller köp). Killen, Katten och Växten har var sitt steg 1–5 (matten:
+  // AE i spelmotorn): 5 karaktärssymboler i vinster ger nästa steg, och steg 5 heter ALTER EGO. Stegen styr inga lager
+  // (lagren är borttagna och byggs om, Pontus 2026-11-10); karaktären byter bara bild.
   // Här: bilderna per steg (alla karaktärer på brädet byter bild), panelen med karaktärerna och LEVEL UP.
   var AE_SYM = [2, 3, 4], AE_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN'];
-  var AE_LCOL = ['#2fb4ff', '#3ccf6e', '#ff2d4f', '#d23cff', '#ffd21f'];   // lagrens färger (LAYER 1–5), som C&T
+  var AE_PIP = '#ff8629', AE_PIP_MAX = '#ffd21f';   // stegens färg (orange accent) och ALTER EGO (gul)
   // Pontus fem bilder per karaktär (steg 1–5); steg 1 är samma bild som symbolen i grundspelet
   var AE_SRC = {
     2: [0, 1, 2, 3, 4].map(function (k) { return 'assets/figur/lv' + k + '.webp'; }),
@@ -89,17 +88,11 @@
     for (var i = 0; i < 3; i++) {
       var k = ae.s[i], row = rows[i], img = row.querySelector('img'), src = AE_SRC[AE_SYM[i]][k - 1];
       if (img.getAttribute('src') !== src) img.setAttribute('src', src);
-      row.querySelector('.ae-step').textContent = k >= 5 ? 'ALTER EGO · INFINITY' : 'STEG ' + k + ' · LAYER ' + (k === 1 ? '1' : '1–' + k);
-      row.querySelectorAll('.ae-pips i').forEach(function (p, j) { p.style.background = j < k ? AE_LCOL[j] : ''; });
+      row.querySelector('.ae-step').textContent = k >= 5 ? 'ALTER EGO' : 'STEG ' + k + ' AV 5';
+      row.querySelectorAll('.ae-pips i').forEach(function (p, j) { p.style.background = j < k ? (k >= 5 ? AE_PIP_MAX : AE_PIP) : ''; });
       row.querySelectorAll('.ae-wins i').forEach(function (p, j) { p.classList.toggle('on', k < 5 && j < ae.c[i]); });
       row.classList.toggle('max', k >= 5);
       if (up && up.indexOf(i) >= 0) { row.classList.remove('up'); void row.offsetWidth; row.classList.add('up'); }
-    }
-    // C&T:s lagerstege visar hur djupt den bästa karaktären når; steg 5 öppnar INFINITY
-    if (state.fs) {
-      var top = Math.max(ae.s[0], ae.s[1], ae.s[2]);
-      state.fs.ladU = top >= 5 ? infD() : top; state.fs.ladC = 0;
-      try { renderMeter(); } catch (e) { /* mätaren ritas nästa gång */ }
     }
   }
   function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeSprites([1, 1, 1]); aeRender({ s: [1, 1, 1], c: [0, 0, 0] }); }
@@ -120,10 +113,6 @@
       fx.innerHTML = '<div class="ae-card' + (k >= 5 ? ' max' : '') + '"><img alt="" src="' + AE_SRC[AE_SYM[i]][k - 1] + '"><b>' +
         (k >= 5 ? AE_NAMN[i] + ' · ALTER EGO!' : AE_NAMN[i] + ' · STEG ' + k) + '</b></div>';
       (document.getElementById('frame') || document.body).appendChild(fx);
-      try {
-        Sound.tone(392, 0.16, { type: 'triangle', vol: 0.12 }); Sound.tone(523, 0.16, { type: 'triangle', vol: 0.12, when: 0.1 });
-        Sound.tone(k >= 5 ? 1046 : 784, 0.32, { type: 'triangle', vol: 0.12, when: 0.2 });
-      } catch (e) { /* inget ljud */ }
       await wait(showTime(k >= 5 ? 1.6 : 1.1));
       fx.remove();
     }

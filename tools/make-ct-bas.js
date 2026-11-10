@@ -106,32 +106,39 @@ rep('var L = 0; for (var i = 1; i < 6; i++) L += Math.hypot', 'var L = 0; for (v
 rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 95" aria-hidden="true">', 'vägbildens storlek');
 // ---- 7x7-mattens skalor och bomber (prototyp, mätt i sidan 2026-11-10 med CTMath.playGame/buyGame, inte certifierat).
 // Grundspelet: en bomb på hjul 1–6 och ingen på hjul 7 (C&T hade 1,1,1,1,1,2 på sex hjul; sju hjul med sju rader gav
-// Bonusspelet var 72:a snurr). Då kommer Bonusspelet ungefär var 245:e snurr. Skalorna: hela spelet cirka 96 % (grundspelet
-// cirka 62 %, bonusarna cirka 34 %), köpt Bonusspel och köpt ALTER EGO cirka 96 %. Bonusarnas vinster är scale × fsScale
-// och scale × maniacScale.
-var CAL = { scale: 0.10713, fsScale: 0.08228, maniacScale: 0.5195 };
+// Bonusspelet var 72:a snurr). Bonusspelet kommer ungefär var 280:e snurr. Utan lager (NOLAYER nedan) och med multi x1 i
+// bonusarna: hela spelet cirka 93–96 % (grundspelet cirka 66 %, bonusarna cirka 30 %), köpt Bonusspel och köpt ALTER EGO
+// cirka 96 %. Bonusarnas vinster är scale × fsScale och scale × maniacScale.
+var CAL = { scale: 0.4338, fsScale: 3.649, maniacScale: 23.05 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
 rep("document.title = 'C&T Maniac';", "document.title = 'ALTER EGO';", 'fliktiteln');
+// inget ljud alls (Pontus 2026-11-10: "Ta bort allt ljud"): ljudmotorn startar aldrig, som i en webbläsare utan Web Audio
+// (C&T:s kod klarar det: alla ljud kollar Sound.ctx). Ljudknappen står kvar men gör inget hörbart; ljudfilerna hämtas inte.
+rep('      var AC = window.AudioContext || window.webkitAudioContext;\n      if (!AC) return;', '      return;   // ALTER EGO: inget ljud', 'ljudmotorn');
 // summeringen efter bonusen spelar en ton per diagonal; 7x7 har 13 diagonaler (6x6 hade 11), annars blir tonen NaN och bonusen fastnar
 rep('var BC_PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24];', 'var BC_PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27, 29];', 'summeringens toner');
 // storvinst-rutans bakgrund och nivåtitlar är konst (bortplockad): dölj de tomma bilderna, så att ingen trasig bildram syns
 rep('</head>', '<style>img.ws-bg[src=""], img.ws-ti[src=""], img.ws-bg:not([src]), img.ws-ti:not([src]) { visibility: hidden; }</style></head>', 'storvinstens tomma bilder');
 rep("var kick = state.fs.maniac ? txl('Infinity klart') : txl('Bonusspel klart');", "var kick = state.fs.maniac ? txl('ALTER EGO klart') : txl('Bonusspel klart');", 'summeringens rubrik');
 rep("'Infinity klart': 'Infinity complete',", "'ALTER EGO klart': 'ALTER EGO complete',", 'summeringens rubrik på engelska');
-// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Spelmotorn: Killen (2), Katten (3) och Växten (4) har
-// var sitt steg 1–5. Steget = hur många lager karaktärens vinster når (steg 5: alla lager och INFINITY). 5 karaktärssymboler i vinster (brädet och lagren)
-// ger nästa steg. Andra symboler når bara LAYER 1. C&T:s gemensamma stege är avstängd i den bonusen.
+// ---- NOLAYER: lagerfunktionen bort (Pontus 2026-11-10: "Ta bort alla med layerfunktionen som den är nu. Vi ska bygga den
+// på ett annat vis."). C&T:s lagerkod ligger kvar men stängs av: i spelmotorn med TIME-värdena nedan, i spelet med
+// patcharna under "lagren syns inte". Multin i bonusarna växte bara med lagren och står nu på x1.
+// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Killen (2), Katten (3) och Växten (4) har var sitt steg
+// 1–5; 5 karaktärssymboler i vinster ger nästa steg och karaktären byter bild. Stegen styr inga lager (Pontus
+// 2026-11-10: "Behåll att de levlar").
 rep('var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;',
   'var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;\n' +
+  '  // ALTER EGO: inga lager (tools/make-ct-bas.js, NOLAYER). Vinsterna når aldrig förra snurret, lagren eller INFINITY\n' +
+  '  // (minCur 99), inga lagerkast, ingen kassett vid bonusstart, ingen INFINITY, ingen stege och multin står på x1.\n' +
+  '  TIME.minCur = 99; TIME.layerTedP = 0; TIME.layerCarlaP = 0; TIME.infVals = null; TIME.fsLad = false;\n' +
+  '  TIME.fsPrefill = false; TIME.maniacPrefill = false; TIME.fsLayersDraw = null; TIME.maniacLayersDraw = null;\n' +
+  '  TIME.fsStartDraw = null; TIME.maniacStartDraw = null; TIME.fsStart = 1; TIME.maniacStart = 1;\n' +
   '  // ALTER EGO: AE = { s: steg, c: symboler mot nästa steg } för Killen, Katten och Växten (bara i superbonusen)\n' +
   '  TIME.alterEgo = true;\n' +
   '  // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)\n' +
   '  TIME.scale = ' + CAL.scale + '; TIME.fsScale = ' + CAL.fsScale + '; TIME.maniacScale = ' + CAL.maniacScale + ';\n' +
-  '  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_NEED = 5, AE = null;\n' +
-  '  function aeLim(s) { if (!AE) return LADU; var ci = AE_CH[s]; return ci == null ? 1 : AE.s[ci] >= 5 ? 99 : AE.s[ci]; }\n' +
-  '  function aeInf(s) { if (!AE) return LADU >= (TIME.infAt || 6); var ci = AE_CH[s]; return ci != null && AE.s[ci] >= 5; }', 'AE i spelmotorn');
-rep('for (var k = 0; k < Math.min(layers.length, LADU) && !hit.rows.length; k++)', 'for (var k = 0; k < Math.min(layers.length, aeLim(s)) && !hit.rows.length; k++)', 'lagrens djup per symbol');
-rep('if (!hit.rows.length && INFB && LADU >= (TIME.infAt || 6)) for (var ib = 0;', 'if (!hit.rows.length && INFB && aeInf(s)) for (var ib = 0;', 'INFINITY per symbol');
+  '  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_NEED = 5, AE = null;', 'AE i spelmotorn');
 rep('      if (LADX && opts.fs && layers) {',
   '      // ALTER EGO: varje karaktärssymbol i en vinst (på brädet och i lagren) fyller karaktärens mätare; AE_NEED\n' +
   '      // symboler ger nästa steg (från nästa lavinsteg). En stor vinst kan ge flera steg på en gång.\n' +
@@ -149,8 +156,7 @@ rep('      if (LADX && opts.fs && layers) {',
   '      if (LADX && opts.fs && layers) {', 'stegen i playRound');
 rep('LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;',
   'LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;\n' +
-  '    AE = maniac && INFB && TIME.alterEgo ? { s: [1, 1, 1], c: [0, 0, 0] } : null;\n' +
-  '    if (AE) { LADX = 0; LADU = 99; lad0 = LADU; }', 'AE vid bonusstart');
+  '    AE = maniac && TIME.alterEgo ? { s: [1, 1, 1], c: [0, 0, 0] } : null;', 'AE vid bonusstart');
 rep('var ladIn = LADX ? { u: LADU, c: LADC } : null;', 'var ladIn = LADX ? { u: LADU, c: LADC } : null, aeIn = AE ? { s: AE.s.slice(), c: AE.c.slice() } : null;', 'AE per frispinn');
 rep('f.retrigger = f.scatters >= 3 ? more : 0; f.ladIn = ladIn;', 'f.retrigger = f.scatters >= 3 ? more : 0; f.ladIn = ladIn; f.aeIn = aeIn;', 'AE per frispinn (2)');
 rep('var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;',
@@ -166,7 +172,56 @@ rep('      if (fs) await ladShow(st);\n', '      if (fs) await ladShow(st);\n   
 rep('    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', '    aeEnd();\n    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', 'aeEnd');
 rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
 rep("var INF_LADDER = '<p><b>3 lagervinster</b> öppnar nästa LAYER. Sist öppnas <b class=\"inf-word\">INFINITY</b></p>';",
-  "var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. Steget är hur många LAYER karaktären når. <b>Steg 5 = ALTER EGO</b> når <b class=\"inf-word\">INFINITY</b></p>';", 'bonusens regel');
+  "var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. <b>Steg 5 = ALTER EGO</b></p>';", 'bonusens regel');
+
+// ---- NOLAYER i spelet: lagren syns inte (inga rivna hörn, ingen LAYERSPINS-panel eller stege, inga LAYER-brickor och
+// lagertexter i bonusens startkort, summeringen och reglerna). C&T:s kod för dem ligger kvar men visas inte.
+// cut: byter allt från start (måste finnas en gång) fram till end (första träffen efter start) mot to
+function cut(start, end, to, what) {
+  var a = h.indexOf(start);
+  if (a < 0 || h.indexOf(start, a + 1) >= 0) { console.error((a < 0 ? 'Hittade inte: ' : 'Fler än en träff: ') + what); process.exit(1); }
+  var b = h.indexOf(end, a + start.length);
+  if (b < 0) { console.error('Hittade inte slutet: ' + what); process.exit(1); }
+  h = h.slice(0, a) + to + h.slice(b);
+}
+// förra snurrets symbol i ett rivet hörn av varje ruta
+rep('    ghostView = any ? { grid: res.ghostIn.map(function (col) { return col.slice(); }), t0: clock, out: null } : null;',
+  '    ghostView = null;   // ALTER EGO: inga lager, inga rivna hörn', 'rivna hörn');
+// LAYERSPINS-loggan och LAYER 1–3 till vänster i grundspelet
+rep('      bl.hidden = false;', '      bl.hidden = true;   // ALTER EGO: ingen LAYERSPINS-panel', 'LAYERSPINS-panelen');
+// bonusarna utan djup i spelet: ingen stege, inga LAYER-brickor i startkortet och inga lagerrader i summeringen
+rep('depth: maniac ? M.TIME.maniacDepth : M.TIME.fsDepth };', 'depth: 0 };   // ALTER EGO: inga lager i bonusarna', 'bonusens lagerdjup i spelet');
+// bonusens startkort: bara karaktärerna (superbonusen) och bomberna
+cut("      // Tidsvägar: reglerna i korta, stora rader", "      // ingen knapp, samma text som överallt",
+  "      // ALTER EGO: inga lager, så bara karaktärerna (superbonusen) och bomberna\n" +
+  "      '<div class=\"cv-facts\">' + (maniac && M.TIME.alterEgo ? txl(INF_LADDER) : '') + txl('<p><b>3 BOMBER</b> = +{n} frispinn</p>', { n: maniac ? 3 : M.FS_RETRIGGER }) + '</div>' +\n",
+  'bonusens startkort');
+// reglerna (i-knappen): lagertexterna bort (mtRuleText läser kassettens värden, som inte finns längre, och kraschade)
+cut("    var fsRule = '<li>' + mtRuleText(false) + '</li>' +", "    $('#infoBody').innerHTML =",
+  "    var fsRule = '', mnRule = '<li>' + txl('Killen, Katten och Växten levlar var för sig: 5 karaktärssymboler i vinster ger nästa steg. Karaktären byter bild för varje steg, och steg 5 heter ALTER EGO.') + '</li>';\n",
+  'reglernas bonusregler');
+// exemplet med det rivna hörnet under "Så vinner du" (Wild-exemplet blir sist)
+cut("] },\n      { t: 'Layerspins', x: txl('Saknas symbolen på nästa hjul kan förra snurrets symbol", "\n    ];\n    var cards = ex.map(", '] }', 'reglernas Layerspins-exempel');
+cut("      '<section><h3>Layerspins</h3><ul>' +", "      '<section><h3>' + txl('Vinsttabell')", '', 'reglernas Layerspins');
+cut("      '<li>' + (M.TIME.fsLad ? txl('Stegen: kassetten öppnar", "      fsRule +", '', 'reglernas lager i Bonusspelet');
+cut("      '<li>' + (M.TIME.infVals ? infRuleLadder()", "      mnRule +", '', 'reglernas lager i superbonusen');
+cut("      '<li>' + txl('3 LAYERS: varje snurr spelas med LAYER 1–3", "      '<li>' + txl('Vinsterna räknas i gånger insatsen som vanligt.", '', 'reglernas 3 LAYERS');
+rep("'<section><h3>' + txl('Infinity-bonus') + '</h3><ul>' +", "'<section><h3>ALTER EGO</h3><ul>' +", 'reglernas rubrik');
+rep("txl('RTP köpt Infinity')", "txl('RTP köpt ALTER EGO')", 'reglernas RTP-rad', true);
+rep('Blir en av bomberna guld startar Infinity-bonusen i stället.', 'Blir en av bomberna guld startar ALTER EGO i stället.', 'reglernas guldbomb (1)', true);
+rep('Guldbomben startar Infinity-bonusen med {n} frispinn.', 'Guldbomben startar ALTER EGO med {n} frispinn.', 'reglernas guldbomb (2)', true);
+rep("txl('I Infinity-bonusen är vinsterna vinsttabellen gånger {s}", "txl('I ALTER EGO är vinsterna vinsttabellen gånger {s}", 'reglernas skala', true);
+rep("txl('Köp: Infinity-bonusen för {x} gånger insatsen. Köpt Infinity-bonus ger i snitt {p} tillbaka.'", "txl('Köp: ALTER EGO för {x} gånger insatsen. Köpt ALTER EGO ger i snitt {p} tillbaka.'", 'reglernas köp', true);
+rep("txl('INFINITY HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir Infinity-bonusen.", "txl('ALTER EGO HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir ALTER EGO.", 'reglernas läge', true);
+// köpmenyn: superbonusen heter ALTER EGO, och läget 3 LAYERS finns inte
+rep("card('b2', 'mn', 'INFINITY<small>BONUS</small>',", "card('b2', 'mn', 'ALTER EGO<small>BONUS</small>',", 'köpmenyns superbonus');
+rep("      btn('inf', 'mn', 'INFINITY<br>HUNT', txl('Varje bonus blir INFINITY')) +\n      btn('lay3', 'ly', '3<br>LAYERS', txl('LAYER 1–3 i varje snurr')) + '</div></div>';",
+  "      btn('inf', 'mn', 'ALTER EGO<br>HUNT', txl('Varje bonus blir ALTER EGO')) + '</div></div>';", 'köpmenyns lägen');
+// guiden "Så funkar spelet" handlar om Layerspins och kassetten: menyvalet döljs (som "Hur man spelar", INTRO_PAUSAT)
+rep('<button class="mitem" type="button" id="mGuide">', '<button class="mitem" type="button" id="mGuide" hidden>', 'guiden i menyn');
+// laddningsskärmens LAYERSPINS-märke
+rep("{ lsEl = document.createElement('div'); lsEl.className = 'ld-ls'; lsEl.innerHTML = lsLockupHtml(); var lg0 = L.querySelector('.ld-game'); if (lg0) lg0.appendChild(lsEl); else lsEl = null; }",
+  "{ lsEl = null; }   // ALTER EGO: inget LAYERSPINS-märke", 'laddningsskärmens märke');
 
 // rakt in i spelet: inget ODD HEAD-intro och ingen startskärm med "Hur man spelar" (C&T:s egen brytare; Pontus
 // 2026-11-10: "ta bort introt och 'hur man spelar' nu när vi ska börja bygga produkten"). Reglerna finns kvar i menyn.
