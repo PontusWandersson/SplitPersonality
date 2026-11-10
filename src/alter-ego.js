@@ -7,20 +7,11 @@
   // Här: bilderna per steg (alla karaktärer på brädet byter bild), panelen med karaktärerna och LEVEL UP.
   var AE_SYM = [2, 3, 4], AE_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN'];
   var AE_LCOL = ['#2fb4ff', '#3ccf6e', '#ff2d4f', '#d23cff', '#ffd21f'];   // lagrens färger (LAYER 1–5), som C&T
-  // platshållare för Katten och Växten tills deras fem bilder finns: formen blir större för varje steg, med stegets siffra
-  function aePh(kind, fill, k) {
-    var sc = 0.78 + 0.055 * k, path = kind === 'diamond' ? 'M240 40L430 240L240 440L50 240Z' : 'M240 50L440 420H40Z';
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480">' +
-      '<g transform="translate(240 240) scale(' + sc.toFixed(3) + ') translate(-240 -240)"><path d="' + path + '" fill="' + fill + '" stroke="#15111f" stroke-width="14" stroke-linejoin="round"/></g>' +
-      (k ? '<circle cx="384" cy="96" r="72" fill="' + AE_LCOL[k] + '" stroke="#15111f" stroke-width="12"/>' +
-        '<text x="384" y="130" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="100" fill="#fff" stroke="#15111f" stroke-width="10" paint-order="stroke">' + (k + 1) + '</text>' : '') +
-      '</svg>';
-    return 'data:image/svg+xml,' + encodeURIComponent(svg);
-  }
+  // Pontus fem bilder per karaktär (steg 1–5); steg 1 är samma bild som symbolen i grundspelet
   var AE_SRC = {
     2: [0, 1, 2, 3, 4].map(function (k) { return 'assets/figur/lv' + k + '.webp'; }),
-    3: [0, 1, 2, 3, 4].map(function (k) { return aePh('diamond', '#ff6f91', k); }),
-    4: [0, 1, 2, 3, 4].map(function (k) { return aePh('triangle', '#a78bfa', k); })
+    3: [0, 1, 2, 3, 4].map(function (k) { return 'assets/figur/katt-lv' + k + '.webp'; }),
+    4: [0, 1, 2, 3, 4].map(function (k) { return 'assets/figur/vaxt-lv' + k + '.webp'; })
   };
   var AE_IMG = {}, AE_BASE = {};
   AE_SYM.forEach(function (s) {
