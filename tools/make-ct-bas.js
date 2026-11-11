@@ -53,6 +53,12 @@ var OUT = 'stroke="#15111f" stroke-width="14" stroke-linejoin="round"';
 function word(t, size, fill) {
   return '<text x="240" y="' + (240 + size * 0.36) + '" text-anchor="middle" font-family="Impact, \'Arial Black\', sans-serif" font-size="' + size + '" fill="' + fill + '" ' + OUT + ' paint-order="stroke">' + t + '</text>';
 }
+// WILD med multi (superbonusens hjul): som WILD, med multin under ordet
+function wildX(t) {
+  return svg('<rect x="50" y="70" width="380" height="340" rx="60" fill="#ffd21f" ' + OUT + '/>' +
+    '<text x="240" y="230" text-anchor="middle" font-family="Impact, \'Arial Black\', sans-serif" font-size="118" fill="#15111f">WILD</text>' +
+    '<text x="240" y="372" text-anchor="middle" font-family="Impact, \'Arial Black\', sans-serif" font-size="140" fill="#ff3b3b" ' + OUT + ' paint-order="stroke">' + t + '</text>');
+}
 var BILD = {
   0: svg('<rect x="50" y="90" width="380" height="300" rx="60" fill="#ffd21f" ' + OUT + '/>' + word('WILD', 150, '#15111f')),
   1: svg('<circle cx="240" cy="240" r="180" fill="#7a3cff" ' + OUT + '/>' + word('BONUS', 104, '#fff6e0')),
@@ -66,6 +72,7 @@ var BILD = {
   9: 'assets/ikoner/K.webp',
   10: 'assets/ikoner/Q.webp',
   11: svg(word('J', 380, '#f5c451')),
+  12: wildX('x2'), 13: wildX('x3'), 14: wildX('x5'),
   22: svg('<circle cx="240" cy="240" r="190" fill="#ffd21f" ' + OUT + '/>' + word('∞', 300, '#15111f'))
 };
 must(/var SYM_BILDER = \{[^\n]*\};/, 'SYM_BILDER');
@@ -133,16 +140,31 @@ rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 
 // (2 500 köp var), alltså 2,90. Spärren (alla fyra på LAYER 4) släpper i cirka 12 % av bonusarna (på LAYER 3 skulle den
 // släppa i 34 %), oftast sent (median frispinn 12). Medianen cirka 230x på köpet för 500x, de sämsta 10 % cirka 66x, 20 %
 // under 100x, finalen står för drygt hälften och INFINITY för 5–11 %.
-var CAL = { scale: 0.4489, fsScale: 3.527, maniacScale: 2.9 };
+// Mattespecen (2026-11-11, scratchpad sim-hel.js och sim-lan.js, två omgångar): grundspelet utan lager gav ensamt 68,28 %
+// vid scale 0,446 (14 M snurr sammanlagt; Bonusspel var 283:e snurr, ALTER EGO var 34 000:e), köpt Bonusspel 95,8 % vid
+// fsScale × scale 1,556 (180 000 köp) och köpt ALTER EGO cirka 96,5 % vid maniacScale × scale 0,2399 (130 000 köp). Nu:
+// grundspelet x0,9922 (cirka 67,7 %), bonusarna så att köpen blir 96,3 %, hela spelet cirka 96,3 % (grundspelet 67,7 % +
+// Bonusspel 27,2 % + ALTER EGO 1,4 %). Bonusarna svänger mycket (±0,8 % per 100 000 köp). Inte certifierat.
+// Pontus 2026-11-11: "96 ska vi uppnå" (inte 96,3). Alla körningar sammanslagna (scratchpad sim-hel.js; 20 M snurr,
+// 280 000 köpta Bonusspel, 100 000 köpta ALTER EGO, räknat per skalenhet): grundsnurret 1,5359 × scale per snurr,
+// Bonusspel var 282:a snurr, ALTER EGO var 35 000:e, Bonusspel 49,26 × scale × fsScale per köp, ALTER EGO 2 007 × scale ×
+// maniacScale per köp. För 96,0 %: köpen 76,8x och 480x, grundspelet 67,4 % + Bonusspel 27,2 % + ALTER EGO 1,4 %.
+var CAL = { scale: 0.4388, fsScale: 3.553, maniacScale: 0.5448 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
 // HUNT-lägena i köpmenyn: två bomber på hjul 1–6 och ingen på hjul 7, så att Bonusspelet kommer ungefär var 43:e snurr
 // (C&T: var 39:e). Med lagermodellen (2026-11-11, 80 000 snurr, grundspelet räknat om till scale 0,4489): grundspelet
 // 0,708x per snurr, Bonusspel 2,34 % och ALTER EGO 0,039 % av snurren. BONUS HUNT ger då cirka 2,70x per snurr och ALTER
 // EGO HUNT (varje bonus blir ALTER EGO) cirka 12,10x, så priserna 2,80x och 12,55x ger cirka 96,3 och 96,4 % (±2 %).
 // (Förut, utan lager: 2,85x och 12,75x.)
+// Mattespecen (2026-11-11, 2,8 M snurr per läge, grundspelet utan lager, räknat om till scale 0,4425): grundspelet
+// 0,730x per snurr, Bonusspel 2,36 % och ALTER EGO 0,038 % av snurren i BONUS HUNT (cirka 2,73x per snurr), bonus 2,38 %
+// av snurren i ALTER EGO HUNT (cirka 12,20x). 2,80x och 12,55x gav då cirka 97,5 och 97,2 % (över Stakes 96,7 %), så
+// priserna var 2,83x och 12,65x (cirka 96,5 och 96,4 %). Med 96,0 % som mål (scale 0,4388, 4,4 M snurr per läge):
+// BONUS HUNT cirka 2,706x per snurr, ALTER EGO HUNT cirka 12,17x, så 2,81x (96,3 %; 2,82x skulle ge 95,96 %, under
+// Stakes gräns) och 12,67x (96,05 %).
 rep('  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 3];', '  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 2, 0];', 'bomberna i HUNT-lägena');
-rep("    hunt: { price: 3, strips: 'hunt' },\n    inf: { price: 14, strips: 'hunt', inf: true },", "    hunt: { price: 2.8, strips: 'hunt' },\n    inf: { price: 12.55, strips: 'hunt', inf: true },", 'HUNT-lägenas priser');
-rep('var MODE_RTP = { hunt: 96.6, inf: 95.8, lay3: 96.5 };', 'var MODE_RTP = { hunt: 96.3, inf: 96.4, lay3: 96.5 };', 'HUNT-lägenas återbetalning');
+rep("    hunt: { price: 3, strips: 'hunt' },\n    inf: { price: 14, strips: 'hunt', inf: true },", "    hunt: { price: 2.81, strips: 'hunt' },\n    inf: { price: 12.67, strips: 'hunt', inf: true },", 'HUNT-lägenas priser');
+rep('var MODE_RTP = { hunt: 96.6, inf: 95.8, lay3: 96.5 };', 'var MODE_RTP = { hunt: 96.3, inf: 96.0, lay3: 96.5 };', 'HUNT-lägenas återbetalning');
 rep("document.title = 'C&T Maniac';", "document.title = 'ALTER EGO';", 'fliktiteln');
 // inget ljud alls (Pontus 2026-11-10: "Ta bort allt ljud"): ljudmotorn startar aldrig, som i en webbläsare utan Web Audio
 // (C&T:s kod klarar det: alla ljud kollar Sound.ctx). Ljudknappen står kvar men gör inget hörbart; ljudfilerna hämtas inte.
@@ -172,6 +194,8 @@ rep('var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;',
   '  TIME.fsPrefill = false; TIME.maniacPrefill = false; TIME.fsLayersDraw = null; TIME.maniacLayersDraw = null;\n' +
   '  TIME.fsStartDraw = null; TIME.maniacStartDraw = null; TIME.fsStart = 1; TIME.maniacStart = 1;\n' +
   '  TIME.alterEgo = true;\n' +
+  '  // mattespecen: maxvinst 25 000x insatsen per omgång (förut 20 000x)\n' +
+  '  TIME.maxX = 25000;\n' +
   '  // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)\n' +
   '  TIME.scale = ' + CAL.scale + '; TIME.fsScale = ' + CAL.fsScale + '; TIME.maniacScale = ' + CAL.maniacScale + ';\n' +
   AE_MOTOR, 'ALTER EGO i spelmotorn');
@@ -186,14 +210,23 @@ rep('    var startGrid = grid;\n    for (;;) {',
   '    if (opts.place) opts.place.forEach(function (p) { grid[p.r][p.y] = p.sym; });\n' +
   '    var aecOn = !!(AEC && opts.fs && !opts.aeFinal), aeC0 = aecOn ? AEC.lev.slice() : null, aeOpen0 = aecOn ? AEC.open : false;\n' +
   '    if (aecOn) aecPlaceIcons(grid);\n' +
-  '    var startGrid = grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
+  '    // superbonusen (mattespecen): frispinnet landar från FRAMÅT (rutorna som lånades fylls ovanifrån), finalens lager från\n' +
+  '    // lagrets bräde; aecV = INFINITY-talen på rutorna. Sedan dras nästa frispinns bräde (FRAMÅT), om det finns ett.\n' +
+  '    var aecLd = null, aecV = null, aecV0 = null, aecNext0 = null;\n' +
+  '    if (aecOn || opts.aecBoard) {\n' +
+  '      aecLd = aecLanding(rng, strips, grid, stops, aecOn ? AEC.next : opts.aecBoard, aecOn ? aecFixed() : aecFixedFrom(opts.place || []), aecOn ? null : opts.place);\n' +
+  '      grid = aecLd.grid; stops = aecLd.stops; aecV = aecLd.v; aecV0 = copyGrid(aecV);\n' +
+  '      if (opts.aecBoard) opts.aeInf = aecV;\n' +
+  '    }\n' +
+  '    if (aecOn) { AEC.upSpin = [false, false, false, false]; AEC.next = opts.aecNext ? aecBoard(rng) : null; aecNext0 = aecCopyB(AEC.next); }\n' +
+  '    var startGrid = aecLd ? aecLd.start : grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
 rep('      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }',
   '      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }\n' +
   '      // superbonusens hörn: vinsten får det högsta LAYER-numret bland hörnen den går genom; INFINITY: talen i rutorna\n' +
   '      if (aecOn) aecWins(ev);\n' +
   '      var aeInfUsed = opts.aeInf ? aecInfWins(ev, opts.aeInf) : null;', 'hörnens multi');
 rep('      var ev = layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);',
-  '      var ev = aeOn ? aeEvaluate(grid) : (aecOn || opts.aeFinal) ? aecEvaluate(grid, layers) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
+  '      var ev = aeOn ? aeEvaluate(grid) : aecOn ? aecEval(grid, aecV) : opts.aeFinal ? aecEvaluate(grid, layers) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
 rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });",
   '      // ALTER EGO: removed är vinstens rutor på brädet (de lyser), gone det som sprängs, up gubbarna som levlar, lused\n' +
   '      // symbolerna ur lagren i vinsterna, aeN gubbarnas steg efter lavinen (steget grid blir nytt LAYER 1)\n' +
@@ -209,12 +242,15 @@ rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ typ
   '      if (aecGoneM) steps[steps.length - 1].gone = aecGoneM;\n' +
   '      if (aecOn) {\n' +
   '        var aecSt = steps[steps.length - 1], aecL = aecLevel(ev);\n' +
-  '        aecSt.aeCup = aecL.up; aecSt.aeC = AEC.lev.slice(); aecSt.aeOpen = AEC.open;\n' +
+  '        aecSt.aeCup = aecL.up; aecSt.aeC = AEC.lev.slice(); aecSt.aeOpen = AEC.open; aecSt.aeHit = AEC.hit ? AEC.hit.slice() : [0, 0, 0, 0];\n' +
   '        // spärren släppte: gubbarna går in i mitten efter lavinen (brädet t.grid ändras)\n' +
-  '        if (aecL.opened) { aecSt.aeOpened = true; aecSt.aecPlace = aecPlaceIcons(t.grid); }\n' +
+  '        if (aecL.opened) { aecSt.aeOpened = true; aecSt.aecPlace = aecPlaceIcons(t.grid); aecSt.aecPlace.forEach(function (p) { aecV[p.r][p.y] = 0; }); }\n' +
+  '        // talen och de lånade rutorna som vinsterna använde försvinner (aecUse)\n' +
+  '        aecSt.aecUse = aecUse(ev, aecV);\n' +
   '      }\n' +
   '      if (aeInfUsed) steps[steps.length - 1].aeInfUsed = aeInfUsed;', 'ALTER EGO i lavinen');
-rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, aeOpen0: aeOpen0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
+rep('    // guldbomben: med 4 eller fler bomber när hjulen landar', '    // ALTER EGO: frispinnets slutbräde blir nytt LAYER 1 (aecPush)\n    if (aecOn) aecPush(grid, aecV);\n    // guldbomben: med 4 eller fler bomber när hjulen landar', 'frispinnets bräde blir LAYER 1');
+rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, aeOpen0: aeOpen0, aecV0: aecV0, aecNext0: aecNext0, aecLand: aecLd ? aecLd.land : null, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
 // grundspelets snurr (också i HUNT-lägena) med omgångens egen vägg i stället för C&T:s vägg från förra omgången (Stake:
 // inget får följa med mellan omgångar)
 rep('    var base = thr ? throwRound(rng, hist, thr) : playRound(rng, baseOpts({ ghost: hist[0] }));', '    var base = thr ? throwRound(rng, hist, thr) : aeBaseRound(rng);', 'grundspelets snurr');
@@ -222,19 +258,23 @@ rep('      else base = playRound(rng, baseOpts({ ghost: hist[0], strips: strips 
 rep('LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;',
   'LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;\n' +
   '    // superbonusen: de fyra hörnen börjar på LAYER 1 (gubbarna och lagerzonen från grundspelet gäller inte här)\n' +
-  '    AE = null; AEC = maniac && TIME.alterEgo ? { lev: [1, 1, 1, 1], open: false } : null;', 'ALTER EGO vid bonusstart');
+  '    AE = null; AEC = maniac && TIME.alterEgo ? aecStart(rng) : null;', 'ALTER EGO vid bonusstart');
+// superbonusens frispinn: egna hjul (fler wilds), landar från FRAMÅT (samma stopp) och drar nästa bräde när det finns
+// ett nästa frispinn (aecNext)
+rep('      var f = playRound(rng, { fs: true, fsMult: mult, layers: layers, depth: depth, payScale: scale });',
+  '      var f = playRound(rng, { fs: true, fsMult: mult, layers: layers, depth: depth, payScale: scale, strips: AEC ? STRIPS.aec : undefined, stops: AEC && AEC.next ? AEC.next.stops : undefined, aecNext: !!AEC && left > 0 });', 'superbonusens frispinn');
 rep('var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;',
   '// ALTER EGO-finalen efter sista frispinnet: väggen rivs (aecFinal), lager för lager\n' +
   '    if (AEC) aecFinal(rng, scale, x0, x).forEach(function (fin) { spins.push(fin); x += fin.x; });\n' +
   '    var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;\n' +
   '    var aeLevEnd = AEC ? AEC.lev.slice() : null; AE = null; AEC = null;', 'ALTER EGO vid bonusslut');
 rep('return { lad: ladEnd, ladStart: ladS, maniac: maniac,', 'return { lad: ladEnd, ladStart: ladS, aeLev: aeLevEnd, maniac: maniac,', 'hörnen i bonusens resultat');
-rep('    MODES: MODES,\n', '    MODES: MODES, aeTestSpin: aeTestSpin, aeBaseRound: aeBaseRound, AEC_SYM: AEC_SYM, AEC_HOME: AEC_HOME, AEC_MID: AEC_MID, AEC_LOCK: AEC_LOCK,\n', 'ALTER EGO i CTMath');
+rep('    MODES: MODES,\n', '    MODES: MODES, aeTestSpin: aeTestSpin, aeBaseRound: aeBaseRound, AEC_SYM: AEC_SYM, AEC_HOME: AEC_HOME, AEC_MID: AEC_MID, AEC_LOCK: AEC_LOCK, AEC_HITS: AEC_HITS,\n', 'ALTER EGO i CTMath');
 // spelet: gubbarna, lagerzonen och panelen (src/alter-ego.js), inkopplat i grundspelet och bonusflödet
 var AE_JS = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego.js'), 'utf8');
 rep('  async function runFreeSpins(', AE_JS + '  async function runFreeSpins(', 'runFreeSpins');
 rep('    if (!document.body.classList.contains(\'fs\')) fsOn();\n', '    if (!document.body.classList.contains(\'fs\')) fsOn();\n    if (maniac && M.TIME.alterEgo) aecInit();\n', 'hörnen vid bonusstart');
-rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeC0 || res.aeFinal) await aecSpinStart(res);\n      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      if (res.aeC0 || res.aeFinal) aecLanded(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
+rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeC0 || res.aeFinal) await aecSpinStart(res);\n      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      if (res.aeC0 || res.aeFinal) aecLanded(res);\n      if (res.aecLand) await aecFill(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
 // finalen: lagren räknas inte som frispinn och ger inga nya frispinn
 rep('      state.fs.left--; renderMeter(); hud(); clearChips();', '      if (!plan.spins[si].aeFinal) state.fs.left--; renderMeter(); hud(); clearChips();', 'finalens lager räknas inte som frispinn');
 rep('      if (res.scatters >= 3) {', '      if (res.scatters >= 3 && !res.aeFinal) {', 'finalen utan nya frispinn');
@@ -251,15 +291,17 @@ rep('    if (T().minRound && clock - round0 < T().minRound) await wait(T().minRo
 rep('  function drawCell(g, c, x, time, highlight) {\n    var y = c.y * cell;',
   '  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram, och en ruta i lagerzonen visar zonen och LAYER 1 (src/alter-ego.js)\n' +
   '  function drawCell(g, c, x, time, highlight) {\n' +
+  '    if (c.sym < 0) { if (aecView) aecHole(g, c, x); return; }   // superbonusen: rutan lånades framåt (tom tills den fylls)\n' +
   '    var aeS = aeSwap(c, x), aeZv = aeZoneAt(c, x);\n' +
   '    if (aeS) aeTile(g, c, x, highlight, aeS.k); else if (aeZv) aeZoneBg(g, c, x, highlight, aeZv);\n' +
   '    try { drawCell0(g, c, x, time, highlight); } finally { aeUnswap(aeS); }\n' +
   '    if (aeS) aeMark(g, c, x, highlight, aeS.k);\n' +
   '    if (aeZv) aePeek(g, c, x, highlight, aeZv);\n' +
+  '    if (c.aecDoor) aecDorr(g, c, x);   // superbonusen: en lånad symbol i vinsten\n' +
   '  }\n' +
   '  function drawCell0(g, c, x, time, highlight) {\n    var y = c.y * cell;', 'gubbarna på brädet');
 rep('          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n      } else {',
-  '          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n        if (aeLockView) aeDrawLocked(g, r, x);\n        if (aecSpin) aecDrawLocked(g, r, x);\n      } else {', 'låsta gubbar under snurret');
+  '          if (s >= 0) g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);   // ALTER EGO: -1 = rutan lånades framåt (tom)\n        }\n        if (aeLockView) aeDrawLocked(g, r, x);\n        if (aecSpin) aecDrawLocked(g, r, x);\n      } else {', 'låsta gubbar under snurret');
 // de låsta gubbarna ritas sist, så att det som faller förbi dem i lavinen går bakom
 rep('        for (var i = 0; i < reel.cells.length; i++) drawCell(g, reel.cells[i], x, time, highlight);',
   '        for (var i = 0; i < reel.cells.length; i++) if (!(reel.cells[i].ae >= 2)) drawCell(g, reel.cells[i], x, time, highlight);\n' +
@@ -281,7 +323,9 @@ rep('    else if (res.scatters < 3 && win >= bet() * WINSHOW_MIN * modePrice(gam
 rep('        if (!state.slam && (bombAnt || tAnt) && idx > 0) {', '        if (!state.slam && !aeTestOn && (bombAnt || tAnt) && idx > 0) {', 'läget utan bombväntan');
 rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
 rep("var INF_LADDER = '<p><b>3 lagervinster</b> öppnar nästa LAYER. Sist öppnas <b class=\"inf-word\">INFINITY</b></p>';",
-  "var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. <b>Steg 5 = ALTER EGO</b></p>';", 'bonusens regel');
+  "var INF_LADDER = '<p><b>3 vinster</b> ger gubben nästa LAYER. <b>Alla fyra på LAYER 4 = ALTER EGO</b></p>';", 'bonusens regel');
+// superbonusens hjul snurrar med sina egna remsor (fler wilds)
+rep('    var strips = fs ? M.STRIPS.fs : md && md.strips ? M.STRIPS[md.strips] : REN_STRIPS;', '    var strips = fs ? (aecView && M.STRIPS.aec ? M.STRIPS.aec : M.STRIPS.fs) : md && md.strips ? M.STRIPS[md.strips] : REN_STRIPS;', 'superbonusens remsor');
 
 // ---- NOLAYER i spelet: lagren syns inte (inga rivna hörn, ingen LAYERSPINS-panel eller stege, inga LAYER-brickor och
 // lagertexter i bonusens startkort, summeringen och reglerna). C&T:s kod för dem ligger kvar men visas inte.
