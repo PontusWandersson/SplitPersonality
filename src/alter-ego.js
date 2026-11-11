@@ -1,16 +1,20 @@
   // ================================================================ ALTER EGO (superbonusen)
   // Förs in i C&T-koden av tools/make-ct-bas.js (före runFreeSpins), så allt i C&T:s spelkod går att använda här.
-  // Gubbarna levlar, låses och sprider sig (prototyp, Pontus 2026-11-11: "Ersätt dörrarna"; matten i
-  // src/alter-ego-motor.js): Killen, Katten och Växten i en vinst levlar (får ett lager) och låses fast, och när lavinen
-  // har landat sprider de sig till grannrutorna (en granne per steg, ALTER EGO två), så att det blir kluster.
-  // Här: gubbarnas bild och ram per steg (c.ae = steget, 2–5 = låst), låsta gubbar som står still när hjulen snurrar,
-  // spridningen, panelen, ALTER EGO-kortet och ALTER EGO-läget i TEST.
+  // Lagermodellen (prototyp, Pontus 2026-11-11: "Bygg så ser vi om jag gillar det"; matten i src/alter-ego-motor.js):
+  // varje omgång har sin egen vägg med LAYER 1–5 bakom brädet (inget följer med från förra omgången, Stakes regel), och
+  // lavinerna lägger in sina bräden som nya lager. Killen, Katten och Växten i en vinst levlar och låses, och rutorna runt
+  // en låst gubbe blir en lagerzon där en ruta räknas med symbolerna i lagren bakom den (steg 2 LAYER 1 … ALTER EGO alla,
+  // två varv). I grundspelet gäller det under lavinerna i snurret, i superbonusen hela bonusen.
+  // Här: gubbarnas bild och ram per steg (c.ae = steget, 2–5 = låst), zonen med LAYER 1 i hörnet, symbolerna ur lagren i
+  // vinsten, låsta gubbar som står still när hjulen snurrar, panelen, ALTER EGO-kortet och ALTER EGO-läget i TEST.
   var AE_SYM = [2, 3, 4], AE_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN'];
   var AE_PIP = '#ff8629', AE_PIP_MAX = '#ffd21f';   // stegen (orange accent) och ALTER EGO (gul)
-  // ramen i färgen för gubbens lager: steg 2 = LAYER 1 blå, 3 = LAYER 2 grön, 4 = LAYER 3 röd (UI-basen), 5 = ALTER EGO gul
-  var AE_LAYER_FARG = { 1: '#33c9ff', 2: '#3ccf6e', 3: '#ff3b3b', 4: '#ffd21f' };
-  // gubbens lager: steg k = LAYER k − 1 (ALTER EGO: 4, gul)
-  function aeNar(k) { return k >= 5 ? 4 : Math.max(0, k - 1); }
+  // ramen och zonen i färgen för hur djupt gubben når: steg 2 = LAYER 1 blå, 3 = LAYER 1–2 grön, 4 = LAYER 1–3 röd
+  // (UI-basen), 5 = ALTER EGO, alla fem, gul. Lagren själva har samma färger (LAYER 4 lila, LAYER 5 gul).
+  var AE_LAYER_FARG = { 1: '#33c9ff', 2: '#3ccf6e', 3: '#ff3b3b', 4: '#b45cff', 5: '#ffd21f' };
+  // hur djupt en gubbe på steg k når (samma som aeReach i spelmotorn): ALTER EGO alla fem
+  function aeNar(k) { return k >= 5 ? 5 : Math.max(0, k - 1); }
+  function aeRadie(k) { return k >= 5 ? 2 : 1; }
   // Pontus fem bilder per gubbe (steg 1–5); steg 1 är samma bild som symbolen i grundspelet
   var AE_SRC = {
     2: [0, 1, 2, 3, 4].map(function (k) { return 'assets/figur/lv' + k + '.webp'; }),
@@ -103,24 +107,94 @@
       aeRam(g, x, py, k, 1);
     }
   }
-  // gubbarnas steg från matten (L) läggs på brädets rutor
-  function aeCells(L) {
+  // ---- lagerzonen: aeZ = hur djupt varje ruta når (0 = utanför), aePeekG = LAYER 1 (syns i hörnet på rutorna i zonen)
+  var aeZ = null, aePeekG = null;
+  function aeZoneCalc() {
+    var Z = [], r, y;
+    for (r = 0; r < REELS; r++) Z.push(new Array(ROWS).fill(0));
+    for (r = 0; r < REELS; r++) for (y = 0; y < ROWS; y++) {
+      var c = reels[r] && reels[r].cells[y], k = aeLockView ? aeLockView.L[r][y] : c && c.ae;
+      if (!(k >= 2)) continue;
+      var d = aeNar(k), rad = aeRadie(k);
+      for (var dr = -rad; dr <= rad; dr++) for (var dy = -rad; dy <= rad; dy++) {
+        var rr2 = r + dr, yy = y + dy;
+        if (rr2 >= 0 && rr2 < REELS && yy >= 0 && yy < ROWS && d > Z[rr2][yy]) Z[rr2][yy] = d;
+      }
+    }
+    aeZ = Z;
+  }
+  // rutans zon (bara när rutan står på sin plats)
+  function aeZoneAt(c, x) {
+    if (!aeZ) return 0;
+    var r = Math.round(x / cell), y = Math.round(c.y);
+    return Math.abs(c.y - y) < 0.02 && aeZ[r] ? aeZ[r][y] || 0 : 0;
+  }
+  // zonen: en svag ton i färgen för hur djupt rutan når
+  function aeZoneBg(g, c, x, highlight, z) {
+    if (c.pop >= 0) return;
+    var y = c.y * cell, col = AE_LAYER_FARG[z] || AE_PIP;
+    g.save(); g.globalAlpha = highlight && !c.win ? 0.08 : 0.2;
+    g.fillStyle = col; rr(g, x + cell * 0.04, y + cell * 0.04, cell * 0.92, cell * 0.92, cell * 0.16); g.fill();
+    g.globalAlpha = highlight && !c.win ? 0.15 : 0.55; g.strokeStyle = col; g.lineWidth = Math.max(1, cell * 0.02);
+    g.stroke(); g.restore();
+  }
+  // hörnet: symbolen i LAYER 1 bakom rutan (i vinsten i stället symbolen ur lagret som vinsten använder, med LAYER-siffran)
+  function aePeek(g, c, x, highlight, z) {
+    if (c.pop >= 0) return;
+    var y = c.y * cell;
+    if (c.aeDoor) { aeDorr(g, x, y, c.aeDoor); return; }
+    var r = Math.round(x / cell), yy = Math.round(c.y), sym = aePeekG && aePeekG[r] ? aePeekG[r][yy] : -1;
+    if (sym == null || sym < 0 || !sprites[sym]) return;
+    var s = cell * 0.36, sx = x + cell * 0.6, sy = y + cell * 0.6;
+    g.save(); g.globalAlpha = highlight && !c.win ? 0.2 : 0.95;
+    g.fillStyle = PAPER; g.strokeStyle = AE_LAYER_FARG[1]; g.lineWidth = Math.max(1.5, cell * 0.03);
+    g.beginPath(); g.moveTo(sx + s, sy - s * 0.06); g.lineTo(sx + s, sy + s); g.lineTo(sx - s * 0.06, sy + s); g.closePath(); g.fill(); g.stroke();
+    g.drawImage(sprites[sym], sx + s * 0.34, sy + s * 0.34, s * 0.64, s * 0.64);
+    g.restore();
+  }
+  // en symbol ur ett lager i vinsten: syns stort i hörnet, med LAYER-siffran i lagrets färg
+  function aeDorr(g, x, y, d) {
+    var col = AE_LAYER_FARG[d.d] || AE_PIP, s = cell * 0.5, sx = x + cell * 0.47, sy = y + cell * 0.47;
+    g.save();
+    g.fillStyle = PAPER; g.strokeStyle = col; g.lineWidth = Math.max(2, cell * 0.05);
+    rr(g, sx, sy, s, s, cell * 0.1); g.fill(); g.stroke();
+    if (sprites[d.sym]) g.drawImage(sprites[d.sym], sx + s * 0.06, sy + s * 0.02, s * 0.88, s * 0.88);
+    var lw = cell * 0.56, lh = cell * 0.18, lx = x + cell * 0.04, ly = y + cell * 0.04;
+    g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = Math.max(1.5, cell * 0.025);
+    rr(g, lx, ly, lw, lh, lh * 0.4); g.fill(); g.stroke();
+    g.fillStyle = INK; g.font = Math.round(lh * 0.8) + 'px ' + DISPLAY; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('LAYER ' + d.d, lx + lw / 2, ly + lh * 0.56);
+    g.restore();
+  }
+  // gubbarnas steg från matten (L) läggs på brädets rutor; peek: det nya LAYER 1 (brädet som lavinen sprängde)
+  function aeCells(L, peek) {
     for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) {
       var c = reels[r] && reels[r].cells[y];
       if (!c) continue;
-      c.ae = (L[r] && L[r][y]) || 0;
+      c.ae = (L[r] && L[r][y]) || 0; c.aeDoor = null;
     }
-    aePanel();
+    if (peek) aePeekG = peek.map(function (col) { return col.slice(); });
+    aeZoneCalc(); aePanel();
   }
-  // ett nytt frispinn: de låsta gubbarna står kvar medan hjulen snurrar
+  // ett nytt snurr (grundspelet) eller frispinn: de låsta gubbarna står kvar medan hjulen snurrar
   function aeSpinStart(res) {
     aeBuild(); aePlace(); aeEl.hidden = false;
-    aeLockView = { L: res.aeL0, G: res.startGrid }; aePanel();
+    aeLockView = { L: res.aeL0, G: res.startGrid }; aeZ = null; aePanel();
   }
-  function aeLanded(res) { aeCells(res.aeL0); aeLockView = null; }
-  // gubbarna i vinsten levlar (de sprängs inte): ny bild och ram, en studs och en ring i lagrets färg; når en gubbe
-  // ALTER EGO (steg 5) visas kortet
+  function aeLanded(res) { aeLockView = null; aeCells(res.aeL0, res.aePeek0); }
+  // vinsten: rutorna där vinsten tar en symbol ur ett lager lyser och visar symbolen och lagret
+  function aeLayerWin(st) {
+    st.lused.forEach(function (l) {
+      var c = reels[l.r] && reels[l.r].cells[l.y];
+      if (!c) return;
+      c.win = true;
+      if (!c.aeDoor || l.k > c.aeDoor.d) c.aeDoor = { sym: l.sym, d: l.k };
+    });
+  }
+  // gubbarna i vinsten levlar (de sprängs inte): ny bild och ram, en studs och en ring i färgen för hur djupt de når;
+  // når en gubbe ALTER EGO (steg 5) visas kortet
   async function aeLevel(st) {
+    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.aeDoor = null; }); });
     var top = null;
     st.up.forEach(function (u) {
       var c = reels[u.r] && reels[u.r].cells[u.y];
@@ -129,20 +203,14 @@
       parts.push({ kind: 'ring', x: u.r * cell + cell / 2, y: u.y * cell + cell / 2, life: 0, max: 0.35, c: AE_LAYER_FARG[aeNar(u.k)] || AE_PIP });
       if (u.k >= 5 && !top) top = c.sym;
     });
-    aePanel();
+    aeZoneCalc(); aePanel();
     if (top != null) await aeCard(AE_SYM.indexOf(top), true);
   }
-  // spridningen när lavinen har landat: grannen blir samma gubbe (studs och ring i gubbens lagerfärg); ett kort ögonblick
-  // så att man ser var klustret växer
-  async function aeSpreadShow(st) {
-    st.spread.forEach(function (q, i) {
-      var c = reels[q.r] && reels[q.r].cells[q.y];
-      if (!c) return;
-      c.sym = q.sym; c.ae = 0; c.tagIn = 0;
-      var src = reels[q.fr] && reels[q.fr].cells[q.fy], col = AE_LAYER_FARG[aeNar(src && src.ae || 2)] || AE_PIP;
-      parts.push({ kind: 'ring', x: q.r * cell + cell / 2, y: q.y * cell + cell / 2, life: 0, max: 0.4, c: col, delay: i * 0.03 });
-    });
-    await wait(showTime(0.45), true);
+  // grundspelets omgång är slut: inga låsta gubbar eller zoner syns (inget ska se ut att följa med till nästa omgång)
+  function aeRoundEnd() {
+    if (state.fs) return;
+    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; c.aeDoor = null; }); });
+    aeLockView = null; aeZ = null; aePeekG = null; aePanel();
   }
   function aeCard(i, max) {
     var fx = document.createElement('div'); fx.className = 'ae-fx';
@@ -222,19 +290,19 @@
       row.classList.toggle('max', k >= 5);
     }
   }
-  function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeLockView = null; aePanel(); }
+  function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeLockView = null; aeZ = null; aePeekG = null; aePanel(); }
   function aeEnd() {
     if (aeEl) aeEl.hidden = true;
-    aeLockView = null;
+    aeLockView = null; aeZ = null; aePeekG = null;
     // brädet efter bonusen har inga låsta gubbar
-    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; }); });
+    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; c.aeDoor = null; }); });
     document.querySelectorAll('.ae-fx').forEach(function (f) { f.remove(); });
   }
 
   // ---- TEST-menyn, bonusens startkort och reglerna
   function aeNew() {
     return [['aeMode', 'ALTER EGO-läge (på/av)', 'Varje vanligt snurr spelas som i superbonusen: de låsta gubbarna står kvar mellan snurren. Ingen bonusstart. Tryck igen för att stänga av.'],
-      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar, låses och sprider sig till grannarna.']];
+      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och rutorna runt dem ser ner i lagren.']];
   }
   // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
   // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och de låsta gubbarna står kvar mellan
@@ -251,12 +319,13 @@
     return { version: M.ENGINE_VERSION, thr: null, base: r, bonus: null, rawX: r.x, x: Math.min(r.x, M.TIME.maxX), capped: r.x >= M.TIME.maxX, wallOut: hist };
   }
   function aeFacts() {
-    return '<p><b>Vinst = levla och låsas.</b> Killen, Katten och Växten sprängs inte: de blir nästa gubbe och står kvar (en per hjul).</p>' +
-      '<p>Varje gång en gubbe levlar <b>sprider den sig</b> till en granne, och <b>ALTER EGO till två</b>. Så växer kluster</p>';
+    return '<p><b>Vinst = levla och låsas.</b> Killen, Katten och Växten sprängs inte: de blir nästa gubbe och står kvar hela bonusen.</p>' +
+      '<p>Rutorna runt en låst gubbe <b>ser ner i lagren</b> och vinner också med symbolerna där. <b>ALTER EGO når alla fem</b></p>';
   }
   function aeRule() {
-    return '<li>' + txl('Killen, Katten och Växten i en vinst sprängs inte. De blir nästa gubbe (steg 2–5, ett lager per steg) och låses fast resten av bonusen, en per hjul (en gubbe till på samma hjul sprängs som vanligt). Nästa snurr landar runt dem, och lavinerna faller förbi dem.') + '</li>' +
-      '<li>' + txl('Varje gång en gubbe levlar sprider den sig efter lavinen till en ruta runt om (steg 5, ALTER EGO, till två). Grannen blir samma gubbe, så det blir kluster. Låsta gubbar, BONUS och WILD tas inte över.') + '</li>' +
-      '<li>' + txl('En vinst räknas bara om den har minst en ny symbol (inte bara låsta gubbar).') + '</li>';
+    return '<li>' + txl('Varje omgång har sin egen vägg: LAYER 1–5 bakom brädet. Varje lavin lägger in brädet den sprängde som nytt LAYER 1. Inget följer med mellan omgångarna.') + '</li>' +
+      '<li>' + txl('Killen, Katten och Växten i en vinst sprängs inte. De blir nästa gubbe (steg 2–5) och låses, en per hjul (en gubbe till på samma hjul sprängs som vanligt). I grundspelet står de kvar under lavinerna i snurret, i superbonusen hela bonusen.') + '</li>' +
+      '<li>' + txl('Rutorna runt en låst gubbe ser ner i lagren: där räknas en ruta som sin egen symbol plus symbolerna i lagren bakom den. Steg 2 når LAYER 1, steg 3 LAYER 1–2, steg 4 LAYER 1–3 och steg 5 (ALTER EGO) alla fem, två varv runt gubben. En symbol ur ett lager kan bara användas en gång.') + '</li>' +
+      '<li>' + txl('En vinst räknas bara om den har minst en ny symbol (en symbol som inte är låst, eller en ur ett lager).') + '</li>';
   }
 

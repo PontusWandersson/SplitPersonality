@@ -1,60 +1,105 @@
-  // ================================================================ ALTER EGO i spelmotorn (superbonusen)
-  // Förs in i C&T:s spelmotor av tools/make-ct-bas.js (efter INFB-raden), så scanReel, payLen och TIME finns.
-  // Gubbarna levlar, låses och sprider sig (prototyp, Pontus 2026-11-11: "Ersätt dörrarna" med spridningen: "om man får
-  // ett layer ... sprider ut sina eventuella symboler som kan levlas upp, så man får kluster av samma"):
-  // - Killen (2), Katten (3) och Växten (4) i en vinst sprängs inte. Rutan blir nästa gubbe (steg 2–5, ett steg per
-  //   lavinsteg) och låses fast resten av bonusen; nästa snurr landar runt den. Det som inte är låst faller förbi.
-  // - Ett hjul har plats för AE_PER_REEL låsta gubbar; en gubbe till i en vinst sprängs som vanligt.
-  // - Spridningen: varje gång en gubbe levlar (får ett lager) sprider den sig efter lavinen till grannrutorna (de åtta runt
-  //   om): steg 2–4 till 1 granne och steg 5 (ALTER EGO) till 2 (AE_SPRID). Grannen blir samma gubbe på steg 1 (inte låst).
-  //   Låsta gubbar, BONUS och WILD tas aldrig över, och en ruta tas bara över en gång per lavinsteg. Vilka grannar slumpas.
-  // - En vinst räknas bara om minst en ruta inte var låst; annars skulle samma vinst upprepas.
-  // (Förut, samma dag: dörrar ner i lagren bakom brädet, där LAYER d gav +d i multi för vinsten. Ersatta av spridningen.)
-  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_MAX = 5, AE_PER_REEL = 1, AE = null;
-  // AE under superbonusen: L = gubbens steg per ruta (0 = ingen låst gubbe), S = den låsta gubbens symbol
-  function aeStart() {
-    var L = [], S = [];
+  // ================================================================ ALTER EGO i spelmotorn
+  // Förs in i C&T:s spelmotor av tools/make-ct-bas.js (efter INFB-raden), så scanReel, matchAt, payLen, randBoard och TIME
+  // finns. Lagermodellen (Pontus 2026-11-11: "Bygg så ser vi om jag gillar det"), byggd för Stake: varje omgång är
+  // fristående ("Engine games are strictly stateless"), så allt nedan skapas inne i omgången (C&T:s lösning, egen vägg).
+  // - Omgångens egen vägg: när omgången börjar dras AE_DEPTH tysta bräden (randBoard) som blir LAYER 1–5 bakom brädet.
+  //   Inget kommer från förra omgången.
+  // - Lavinerna fyller på: brädet i varje lavinsteg med vinst läggs in som nytt LAYER 1 (utan rutorna som vann och de
+  //   låsta gubbarna), de andra flyttas ner och det understa faller bort.
+  // - Gubbarna: Killen (2), Katten (3) och Växten (4) i en vinst sprängs inte. Rutan blir nästa gubbe (steg 2–5, ett steg
+  //   per lavinsteg) och låses, en per hjul (AE_PER_REEL; en gubbe till på samma hjul sprängs som vanligt). I grundspelet
+  //   står de låsta under lavinerna i samma snurr, i superbonusen hela bonusen (hela bonusen är en omgång).
+  // - Lagerzonen: rutorna runt en låst gubbe (ett varv, ALTER EGO två) ser ner i lagren. Där räknas en ruta som sin egen
+  //   symbol plus symbolerna i lagren bakom den, så långt gubben når: steg 2 LAYER 1, steg 3 LAYER 1–2, steg 4 LAYER 1–3
+  //   och steg 5 (ALTER EGO) alla fem. En symbol ur ett lager som används i en vinst förbrukas.
+  // - En vinst räknas bara om den har minst en ny ruta: en ruta som inte var låst, eller en symbol ur ett lager.
+  // (Förut, samma dag: dörrar ner i lagren och spridning till grannar; båda ersatta av lagerzonen.)
+  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_MAX = 5, AE_DEPTH = 5, AE_PER_REEL = 1, AE = null;
+  // AE under en omgång: L = gubbens steg per ruta (0 = ingen låst gubbe), S = den låsta gubbens symbol, stack = lagren
+  // (stack[0] = LAYER 1), omgångens egen vägg från början
+  function aeStart(rng) {
+    var L = [], S = [], stack = [];
     for (var r = 0; r < REELS; r++) { L.push(new Array(ROWS).fill(0)); S.push(new Array(ROWS).fill(-1)); }
-    return { L: L, S: S };
+    for (var k = 0; k < AE_DEPTH; k++) stack.push(randBoard(rng));
+    return { L: L, S: S, stack: stack };
   }
-  // hur många grannar en gubbe sprider sig till när den når steg k (AE_SPRID[k]): steg 2–4 en granne, ALTER EGO två.
-  // Simulerat 2026-11-11 (köpt ALTER EGO, maniacScale 3,58, 400–1 000 köp per variant): 1/2/3/alla gav 1 330 % och 14 % i
-  // maxvinsten (vid 96 % skulle de sämsta 10 % ge under 1x); 1/1/2/3 590 %; 1/1/1/3 370 %; 1/1/2/2 300 %; 1/1/1/2 230 %
-  // (vald: jämnast, medianen cirka 300x och de sämsta 10 % cirka 8x vid 96 %); 1/1/1/1 170 %.
-  var AE_SPRID = [0, 0, 1, 1, 1, 2];
-  function aeSprid(k) { return AE_SPRID[Math.min(AE_MAX, k)] || 0; }
-  // de låsta gubbarna står kvar när ett nytt snurr landar
+  // hur djupt en gubbe på steg k når, och hur många varv zonen har
+  function aeReach(k) { return k >= AE_MAX ? AE_DEPTH : Math.max(0, k - 1); }
+  function aeRad(k) { return k >= AE_MAX ? 2 : 1; }
+  // zonen: hur djupt varje ruta når (det djupaste av gubbarna som täcker den)
+  function aeZone() {
+    var Z = [], r, y;
+    for (r = 0; r < REELS; r++) Z.push(new Array(ROWS).fill(0));
+    for (r = 0; r < REELS; r++) for (y = 0; y < ROWS; y++) {
+      var k = AE.L[r][y];
+      if (k < 2) continue;
+      var d = aeReach(k), rad = aeRad(k);
+      for (var dr = -rad; dr <= rad; dr++) for (var dy = -rad; dy <= rad; dy++) {
+        var rr = r + dr, yy = y + dy;
+        if (rr >= 0 && rr < REELS && yy >= 0 && yy < ROWS && d > Z[rr][yy]) Z[rr][yy] = d;
+      }
+    }
+    return Z;
+  }
+  // de låsta gubbarna står kvar när ett nytt frispinn landar (superbonusen)
   function aeOverlay(grid) {
     for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) if (AE.L[r][y]) grid[r][y] = AE.S[r][y];
   }
-  // ways-vinsterna i superbonusen: som evaluate, men en vinst räknas bara om minst en ruta inte var låst
+  // ways-vinsterna med lagerzonen. Som i C&T fyller lagren luckor: saknas symbolen på ett hjul (från hjul AE_MINCUR + 1)
+  // hämtar vinsten en symbol ur lagren i zonen på det hjulet, det grundaste lagret först, helst samma symbol och närmast
+  // raden vinsten kom ifrån (lcols: [{ r, y, k: lagret, sym }]).
+  // (Först räknades varje ruta i zonen med alla lager den nådde: vägarna exploderade, superbonusen gav cirka 1 360 % och
+  // grundspelet ensamt cirka 190 % med samma skalor.)
+  var AE_MINCUR = 1;
+  function aeFetch(Z, r, s, from) {
+    var best = null;
+    for (var k = 0; k < AE.stack.length && !best; k++) for (var y = 0; y < ROWS; y++) {
+      if (Z[r][y] <= k) continue;
+      var lg = AE.stack[k][r][y];
+      if (lg == null || lg < 0) continue;
+      var exact = matchAt(lg, s);
+      if (!exact && !isWild(lg)) continue;
+      var c = { r: r, y: y, k: k + 1, sym: lg, ex: exact, dist: Math.abs(y - from) };
+      if (!best || (c.ex && !best.ex) || (c.ex === best.ex && c.dist < best.dist)) best = c;
+    }
+    return best;
+  }
   function aeEvaluate(grid) {
-    var wins = [], total = 0, PT = TIME.payT || PAY;
+    var wins = [], total = 0, PT = TIME.payT || PAY, Z = aeZone();
     for (var s = 2; s < PAYING; s++) {
-      var ways = 1, len = 0, cols = [], fresh = false, boost = 1;
+      var ways = 1, len = 0, cols = [], lcols = [], fresh = false, boost = 1, from = 3;
       for (var r = 0; r < REELS; r++) {
-        var hit = { rows: [], weight: 0, top: 1 };
-        scanReel(grid, r, s, hit);
-        if (!hit.rows.length) break;
-        for (var q = 0; q < hit.rows.length; q++) if (!AE.L[r][hit.rows[q]]) fresh = true;
-        cols.push(hit.rows);
-        ways *= hit.weight; len++; boost *= hit.top;
+        var rows = [], w = 0, top = 1;
+        for (var y = 0; y < ROWS; y++) {
+          var g = grid[r][y];
+          if (matchAt(g, s)) { rows.push(y); w += 1; if (!AE.L[r][y]) fresh = true; }
+          else if (isWild(g)) { rows.push(y); w += WILD_MULT[g]; if (WILD_MULT[g] > top) top = WILD_MULT[g]; if (!AE.L[r][y]) fresh = true; }
+        }
+        if (w) from = rows.reduce(function (a, b) { return a + b; }, 0) / rows.length;
+        else if (r >= AE_MINCUR) {
+          var f = aeFetch(Z, r, s, from);
+          if (!f) break;
+          lcols.push({ r: f.r, y: f.y, k: f.k, sym: f.sym });
+          w = f.ex ? 1 : WILD_MULT[f.sym]; fresh = true; from = f.y;
+        }
+        if (!w) break;
+        cols.push(rows); ways *= w; len++; boost *= top;
       }
       if (len >= 3 && fresh && payLen(PT, s, len) > 0) {
         var pay = payLen(PT, s, len) * PAY_SCALE * TIME.scale * ways;
-        wins.push({ sym: s, len: len, ways: ways, x: pay, cols: cols, gcols: null, timeAt: -1, boost: boost, tmult: 1, hops: 0 });
+        wins.push({ sym: s, len: len, ways: ways, x: pay, cols: cols, lcols: lcols, gcols: null, timeAt: -1, boost: boost, tmult: 1, hops: 0 });
         total += pay;
       }
     }
     return { wins: wins, x: total };
   }
-  // ett lavinsteg med vinst: gubbarna i vinsterna levlar och låses i stället för att sprängas.
-  // Svarar { gone: det som sprängs, up: [{ r, y, k }] gubbar som levlade }.
+  // ett lavinsteg med vinst: gubbarna i vinsterna levlar och låses i stället för att sprängas, symbolerna ur lagren som
+  // användes förbrukas och brädet läggs in som nytt LAYER 1.
+  // Svarar { gone: det som sprängs, up: [{ r, y, k }] gubbar som levlade, lused: symbolerna ur lagren i vinsterna }.
   function aeStep(grid, wins, removed) {
-    var gone = [], up = [], r, y;
+    var gone = [], up = [], lused = [], seen = {}, r, y;
     for (r = 0; r < REELS; r++) {
       gone.push(new Array(ROWS).fill(false));
-      // AE_PER_REEL: så många låsta gubbar får plats på ett hjul; en gubbe till i en vinst sprängs som vanligt
       var held = 0;
       for (y = 0; y < ROWS; y++) if (AE.L[r][y]) held++;
       for (y = 0; y < ROWS; y++) {
@@ -66,26 +111,21 @@
         AE.S[r][y] = grid[r][y];
       }
     }
-    return { gone: gone, up: up };
-  }
-  // spridningen efter lavinen (grid = brädet efter lavinen, ändras här): varje gubbe som levlade tar över grannrutor.
-  // Svarar [{ r, y, sym, fr, fy }] (fr, fy: gubben som spred sig).
-  function aeSpread(rng, grid, up) {
-    var out = [], taken = {};
-    up.forEach(function (u) {
-      var sym = AE.S[u.r][u.y], n = aeSprid(u.k), cand = [];
-      for (var dr = -1; dr <= 1; dr++) for (var dy = -1; dy <= 1; dy++) {
-        var r = u.r + dr, y = u.y + dy;
-        if ((!dr && !dy) || r < 0 || r >= REELS || y < 0 || y >= ROWS) continue;
-        var g = grid[r][y];
-        // en ruta tas bara över en gång per lavinsteg
-        if (AE.L[r][y] || taken[r + ',' + y] || g === sym || g === S || isWild(g)) continue;
-        cand.push({ r: r, y: y });
-      }
-      for (var i = cand.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)), t = cand[i]; cand[i] = cand[j]; cand[j] = t; }
-      cand.slice(0, n).forEach(function (c) { grid[c.r][c.y] = sym; taken[c.r + ',' + c.y] = true; out.push({ r: c.r, y: c.y, sym: sym, fr: u.r, fy: u.y }); });
+    wins.forEach(function (w) {
+      (w.lcols || []).forEach(function (c) {
+        var key = c.k + ',' + c.r + ',' + c.y;
+        if (seen[key]) return;
+        seen[key] = true; lused.push(c);
+      });
     });
-    return out;
+    lused.forEach(function (c) { AE.stack[c.k - 1][c.r][c.y] = -1; });
+    // brädet blir nytt LAYER 1, utan rutorna som vann och utan de låsta gubbarna (de står kvar på brädet). Annars blir
+    // gubbens eko i lagret en ny symbol varje lavinsteg och samma vinst kommer om och om igen.
+    var layer = copyGrid(grid);
+    for (r = 0; r < REELS; r++) for (y = 0; y < ROWS; y++) if (removed[r][y] || AE.L[r][y]) layer[r][y] = -1;
+    AE.stack.unshift(layer);
+    if (AE.stack.length > AE_DEPTH) AE.stack.length = AE_DEPTH;
+    return { gone: gone, up: up, lused: lused };
   }
   // lavinen med låsta gubbar: de låsta står still och det som är kvar faller förbi dem (hjulet utan de låsta rutorna är som
   // ett kortare hjul); nya symboler fyller de översta lediga rutorna. Samma form på svaret som tumble().
@@ -108,13 +148,20 @@
     }
     return { grid: next, stops: nextStops, moves: moves };
   }
-  // TEST-menyn (ALTER EGO-läget): ett frispinn i superbonusen utanför bonusen, med de låsta gubbarna kvar mellan snurren
-  // (AE_TEST) tills läget nollställs (reset). Samma matte som i bonusen: playRound med frispinnens hjul och superbonusens
-  // vinsttabell.
+  // grundspelets snurr: omgångens egen vägg och gubbarna (bara under lavinerna i det här snurret); extra: t.ex. { strips }
+  // för HUNT-lägena. Inget från förra omgången används.
+  function aeBaseRound(rng, extra) {
+    AE = TIME.alterEgo ? aeStart(rng) : null;
+    var o = { ae: true }; for (var key in extra) o[key] = extra[key];
+    try { return playRound(rng, baseOpts(o)); } finally { AE = null; }
+  }
+  // TEST-menyn (ALTER EGO-läget): ett frispinn i superbonusen utanför bonusen, med gubbarna och lagren kvar mellan snurren
+  // (AE_TEST) tills läget nollställs (reset). Bara ett testverktyg: det för med något mellan snurr och får inte finnas i en
+  // version till Stake.
   var AE_TEST = null;
   function aeTestSpin(rng, reset) {
-    if (reset || !AE_TEST) AE_TEST = aeStart();
-    if (reset) return null;
+    if (reset) { AE_TEST = null; return null; }
+    if (!AE_TEST) AE_TEST = aeStart(rng);
     var keep = AE; AE = AE_TEST;
     try { return playRound(rng, { fs: true, fsMult: 1, layers: [emptyGrid()], depth: 1, payScale: TIME.maniacScale }); }
     finally { AE = keep; }
