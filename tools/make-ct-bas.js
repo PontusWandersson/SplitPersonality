@@ -109,15 +109,11 @@ rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 
 // Bonusspelet var 72:a snurr). Bonusspelet kommer ungefär var 280:e snurr. Utan lager (NOLAYER nedan) och med multi x1 i
 // bonusarna: hela spelet cirka 93–96 % (grundspelet cirka 66 %, bonusarna cirka 30 %), köpt Bonusspel och köpt ALTER EGO
 // cirka 96 %. Bonusarnas vinster är scale × fsScale och scale × maniacScale.
-var CAL = { scale: 0.4338, fsScale: 3.649, maniacScale: 23.05 };
-// ALTER EGO-lagren: maniacScale per variant (0 bara lagren, 1 + multi, 2 + wild, 3 båda), se AE_SCALE i spelmotorn.
-// Köpt ALTER EGO (500x) simulerat i node 2026-11-11 (scratchpad sim-ae.js, köpen genom CTMath.buyGame):
-// 0: 96,6 % ±1,5 (25 000 köp), median 156x, 39 % under 100x, ALTER EGO nås i 25 %.
-// 1: 95,4 % ±2,6 och 99,3 % ±2,7 vid 6,25 och 6,48 (20 000 köp var), median cirka 60x, 60 % under 100x, multin i snitt x7 i
-//    slutet (högst x144).
-// 2: 84,3 % ±2,5 vid 5,0 (20 000 köp), skattat 96 % vid 5,9; median cirka 47x, 69 % under 100x (wilden tar det mesta).
-// 3: inte inställd och inte i menyn: med multi och wild går nästan allt till maxvinsten (median cirka 4x vid 96 %).
-var AE_CAL = [21.85, 6.3, 5.9, 0.44];
+// ALTER EGO med dörrarna (2026-11-11, scratchpad sim-dorr.js, köpt ALTER EGO genom CTMath.buyGame): 97,8, 95,4 och 92,5 %
+// vid maniacScale 3,55 (7 000 köp var), alltså 3,58 för 96 %. Medianen cirka 187x på köpet för 500x, 39 % under 100x, cirka
+// 11 dörrar och 5 låsta gubbar per bonus, ALTER EGO (steg 5) i 78 % av bonusarna, maxvinsten 2 gånger på 21 000 köp.
+// Snittet är detsamma som förut, så hela spelet och HUNT-lägena påverkas inte.
+var CAL = { scale: 0.4338, fsScale: 3.649, maniacScale: 3.58 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
 // HUNT-lägena i köpmenyn (7x7, utan lager; mätt i sidan 2026-11-10 med CTMath.playGame(rng, vägg, läge)): två bomber på
 // hjul 1–6 och ingen på hjul 7, så att Bonusspelet kommer ungefär var 41:a snurr (C&T: var 39:e). BONUS HUNT ger 2,735x per
@@ -138,130 +134,77 @@ rep("'Infinity klart': 'Infinity complete',", "'ALTER EGO klart': 'ALTER EGO com
 // ---- NOLAYER: lagerfunktionen bort (Pontus 2026-11-10: "Ta bort alla med layerfunktionen som den är nu. Vi ska bygga den
 // på ett annat vis."). C&T:s lagerkod ligger kvar men stängs av: i spelmotorn med TIME-värdena nedan, i spelet med
 // patcharna under "lagren syns inte". Multin i bonusarna växte bara med lagren och står nu på x1.
-// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Killen (2), Katten (3) och Växten (4) har var sitt steg
-// 1–5; 5 karaktärssymboler i vinster ger nästa steg och karaktären byter bild. Stegen styr inga lager (Pontus
-// 2026-11-10: "Behåll att de levlar").
+// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Gubben är en dörr ner i lagren (Pontus 2026-11-11: "Bygg
+// så jag får se vad du menar"): Killen (2), Katten (3) och Växten (4) i en vinst levlar och låses, lavinerna bygger lagren
+// och en vinst kan gå ner i lagren genom en låst gubbe. Spelmotorns del ligger i src/alter-ego-motor.js, spelets i
+// src/alter-ego.js. (Förut: först stegen 1–5 per karaktär som styrde LAYER 1–5, sedan lager som revs av; båda borttagna.)
+var AE_MOTOR = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego-motor.js'), 'utf8');
 rep('var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;',
   'var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;\n' +
-  '  // ALTER EGO: inga lager (tools/make-ct-bas.js, NOLAYER). Vinsterna når aldrig förra snurret, lagren eller INFINITY\n' +
-  '  // (minCur 99), inga lagerkast, ingen kassett vid bonusstart, ingen INFINITY, ingen stege och multin står på x1.\n' +
+  '  // ALTER EGO: C&T:s lager är avstängda (tools/make-ct-bas.js, NOLAYER). Vinsterna når aldrig förra snurret, C&T:s lager\n' +
+  '  // eller INFINITY (minCur 99), inga lagerkast, ingen kassett vid bonusstart, ingen INFINITY och ingen stege. Multin\n' +
+  '  // börjar på x1; i superbonusen växer den med ALTER EGO-lagren (src/alter-ego-motor.js).\n' +
   '  TIME.minCur = 99; TIME.layerTedP = 0; TIME.layerCarlaP = 0; TIME.infVals = null; TIME.fsLad = false;\n' +
   '  TIME.fsPrefill = false; TIME.maniacPrefill = false; TIME.fsLayersDraw = null; TIME.maniacLayersDraw = null;\n' +
   '  TIME.fsStartDraw = null; TIME.maniacStartDraw = null; TIME.fsStart = 1; TIME.maniacStart = 1;\n' +
-  '  // ALTER EGO: AE = { s: steg, c: symboler mot nästa steg } för Killen, Katten och Växten (bara i superbonusen)\n' +
   '  TIME.alterEgo = true;\n' +
   '  // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)\n' +
   '  TIME.scale = ' + CAL.scale + '; TIME.fsScale = ' + CAL.fsScale + '; TIME.maniacScale = ' + CAL.maniacScale + ';\n' +
-  '  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_NEED = 5, AE = null;\n' +
-  '  // ALTER EGO-lagren (prototyp, Pontus 2026-11-11: "Ta fram det du har så får jag spela och utefter det ta beslut"):\n' +
-  '  // en karaktär landar med lika många lager som sitt steg. En vinst river av översta lagret och karaktären står kvar, ett\n' +
-  '  // steg mindre; med sista lagret sprängs den som vanligt. Två val som Pontus provar fram (TEST-menyn, variant 0–3):\n' +
-  '  // aeMulti: varje rivet lager (karaktären står kvar) ger +1 i multin, som växer under hela bonusen.\n' +
-  '  // aeWild: ALTER EGO-ögonblicket. När en karaktär når steg 5 blir alla den karaktären på brädet wild (efter lavinen),\n' +
-  '  // var och en tills dess översta lager rivs. Karaktärer som landar senare är vanliga. (Först var varje karaktär som\n' +
-  '  // landade på steg 5 wild, tills den var borta eller tills översta lagret var rivet: wilden skenade, 6–20 % av\n' +
-  '  // superbonusarna slog i maxvinsten och med 96 % hade de andra bonusarna nästan inget kvar.)\n' +
-  '  // AE_SCALE: maniacScale per variant, så att köpt ALTER EGO hamnar nära 96 % i alla fyra (tools/make-ct-bas.js, AE_CAL).\n' +
-  '  var AE_SCALE = ' + JSON.stringify(AE_CAL) + ';\n' +
-  '  function aeVariant(v) { v = v | 0; TIME.aeVar = v; TIME.aeMulti = !!(v & 1); TIME.aeWild = !!(v & 2); TIME.maniacScale = AE_SCALE[v]; }\n' +
-  '  aeVariant(0);\n' +
-  '  // under bedömningen i superbonusen: { g: brädet, w: rutorna som är wild } (scanReel)\n' +
-  '  var AEX = null;\n' +
-  '  // lagren på ett nytt bräde: varje karaktär har sitt steg (0 = ingen karaktär)\n' +
-  '  function aeLay(grid) { return grid.map(function (col) { return col.map(function (g) { var ci = AE_CH[g]; return ci == null ? 0 : AE.s[ci]; }); }); }', 'AE i spelmotorn');
-// wild-karaktärerna räknas som wild för de andra symbolerna (för sin egen symbol är de sig själva)
-rep('      else if (isWild(g)) { out.rows.push(y); out.weight += WILD_MULT[g]; if (WILD_MULT[g] > out.top) out.top = WILD_MULT[g]; }\n    }\n  }',
-  '      else if (isWild(g)) { out.rows.push(y); out.weight += WILD_MULT[g]; if (WILD_MULT[g] > out.top) out.top = WILD_MULT[g]; }\n' +
-  '      else if (AEX && AEX.g === board && AEX.w[r][y]) { out.rows.push(y); out.weight += 1; }\n    }\n  }', 'wild-karaktärerna i scanReel');
-// lagren per ruta när brädet landar (aeL lager, aeW wild)
+  AE_MOTOR, 'ALTER EGO i spelmotorn');
+// superbonusens runda (aeOn): de låsta gubbarna landar på sin plats, vinsterna räknas med dörrarna, gubbarna levlar i
+// stället för att sprängas och lavinen faller förbi de låsta
 rep('    var startGrid = grid;\n    for (;;) {',
-  '    // ALTER EGO-lagren: aeL = lager per ruta (0 = ingen karaktär), aeW = 1 där rutan är wild (TIME.aeWild, ALTER EGO-ögonblicket)\n' +
-  '    var aeL = AE && opts.fs && layers ? aeLay(grid) : null;\n' +
-  '    var aeW = aeL ? aeL.map(function (col) { return col.map(function () { return 0; }); }) : null;\n' +
-  '    var aeL0 = aeL ? copyGrid(aeL) : null, aeW0 = aeW ? copyGrid(aeW) : null;\n' +
-  '    var startGrid = grid;\n    for (;;) {', 'lagren när brädet landar');
+  '    // ALTER EGO: de låsta gubbarna står kvar (aeL0 = gubbarnas steg när brädet landar, aeD0 = antalet lager)\n' +
+  '    var aeOn = !!(AE && opts.fs && layers), aeL0 = null, aeD0 = 0;\n' +
+  '    if (aeOn) { aeOverlay(grid); aeL0 = copyGrid(AE.L); aeD0 = AE.stack.length; }\n' +
+  '    var startGrid = grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
 rep('      var ev = layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);',
-  '      AEX = aeW ? { g: grid, w: aeW } : null;\n' +
-  '      var ev = layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);\n' +
-  '      AEX = null;', 'wild-karaktärerna i bedömningen');
-// en vinst river översta lagret: karaktären står kvar (gone = det som sprängs och faller bort)
+  '      var ev = aeOn ? aeEvaluate(grid) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
 rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });",
-  '      // ALTER EGO-lagren: en karaktär i en vinst som har fler än ett lager sprängs inte. Översta lagret rivs av (ett per\n' +
-  '      // lavinsteg, även om rutan är med i flera vinster) och karaktären står kvar, ett steg mindre. removed är vinstens\n' +
-  '      // rutor (de lyser), gone det som sprängs, peel de rivna lagren ({ r, y, k: lagren kvar }).\n' +
-  '      var gone = removed, aePeel = null;\n' +
-  '      if (aeL) {\n' +
-  '        gone = removed.map(function (col) { return col.slice(); }); aePeel = [];\n' +
-  '        for (var pr = 0; pr < REELS; pr++) for (var py = 0; py < ROWS; py++) if (removed[pr][py] && aeL[pr][py] > 1) {\n' +
-  '          gone[pr][py] = false; aeL[pr][py]--; aeW[pr][py] = 0; aePeel.push({ r: pr, y: py, k: aeL[pr][py] });\n' +
-  '        }\n' +
-  '      }\n' +
-  '      var t = tumble(strips, grid, stops, gone);\n' +
-  "      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, gone: gone, peel: aePeel, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });",
-  'lagren rivs i stället för att sprängas');
-rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aeW0: aeW0, gold: gold, startGrid: startGrid, steps: steps,', 'lagren i rundans resultat');
-rep('    MODES: MODES,\n', '    MODES: MODES, aeVariant: aeVariant,\n', 'aeVariant i CTMath');
-rep('      if (LADX && opts.fs && layers) {',
-  '      // ALTER EGO: varje karaktärssymbol i en vinst (på brädet och i lagren) fyller karaktärens mätare; AE_NEED\n' +
-  '      // symboler ger nästa steg (från nästa lavinsteg). En stor vinst kan ge flera steg på en gång.\n' +
-  '      if (AE && opts.fs && layers) {\n' +
-  '        var aeUp = [];\n' +
-  '        ev.wins.forEach(function (w) {\n' +
-  '          var ci = AE_CH[w.sym]; if (ci == null || AE.s[ci] >= 5) return;\n' +
-  '          var n = 0; w.cols.forEach(function (c) { n += c.length; }); if (w.gcols) w.gcols.forEach(function (c) { n += c.length; });\n' +
-  '          AE.c[ci] += n;\n' +
-  '          while (AE.c[ci] >= AE_NEED && AE.s[ci] < 5) { AE.c[ci] -= AE_NEED; AE.s[ci]++; if (aeUp.indexOf(ci) < 0) aeUp.push(ci); }\n' +
-  '          if (AE.s[ci] >= 5) AE.c[ci] = 0;\n' +
-  '        });\n' +
-  '        steps[steps.length - 1].ae = { s: AE.s.slice(), c: AE.c.slice(), up: aeUp };\n' +
-  '      }\n' +
-  '      // ALTER EGO-lagren efter lavinen: karaktärerna som faller in landar med sitt steg (efter stegen ovan), de som står\n' +
-  '      // kvar behåller sina lager. aeGrow: rivna lager som ger multi (TIME.aeMulti). Steget får aeN, aeWN och aeGrow.\n' +
-  '      if (aeL) {\n' +
-  '        var aeNL = [], aeNW = [];\n' +
-  '        t.moves.forEach(function (mv, mr) {\n' +
-  '          aeNL.push([]); aeNW.push([]);\n' +
-  '          mv.forEach(function (m) {\n' +
-  '            var ci = AE_CH[m.sym];\n' +
-  '            if (m.fresh) { aeNL[mr][m.to] = ci == null ? 0 : AE.s[ci]; aeNW[mr][m.to] = 0; }\n' +
-  '            else { aeNL[mr][m.to] = aeL[mr][m.from]; aeNW[mr][m.to] = aeW[mr][m.from]; }\n' +
-  '            // ALTER EGO-ögonblicket (TIME.aeWild): karaktären nådde steg 5 i det här steget\n' +
-  '            if (ci != null && TIME.aeWild && AE.s[ci] >= 5 && aeUp.indexOf(ci) >= 0) aeNW[mr][m.to] = 1;\n' +
-  '          });\n' +
-  '        });\n' +
-  '        aeL = aeNL; aeW = aeNW;\n' +
-  '        var aeGrow = TIME.aeMulti ? aePeel.length : 0;\n' +
-  '        fsMult += aeGrow;\n' +
-  '        var aeSt = steps[steps.length - 1]; aeSt.aeN = copyGrid(aeL); aeSt.aeWN = copyGrid(aeW); aeSt.aeGrow = aeGrow;\n' +
-  '      }\n' +
-  '      if (LADX && opts.fs && layers) {', 'stegen i playRound');
+  '      // ALTER EGO: removed är vinstens rutor (de lyser, också dörrarna), gone det som sprängs, up gubbarna som levlar,\n' +
+  '      // doors vinsterna genom dörrarna, aeN gubbarnas steg efter lavinen, aeDepth antalet lager\n' +
+  '      var aeS = aeOn ? aeStep(grid, ev.wins, removed) : null;\n' +
+  '      var t = aeS ? aeTumble(strips, grid, stops, aeS.gone) : tumble(strips, grid, stops, removed);\n' +
+  "      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });\n" +
+  '      if (aeS) {\n' +
+  '        var aeSt = steps[steps.length - 1];\n' +
+  '        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.doors = aeS.doors; aeSt.aeN = copyGrid(AE.L); aeSt.aeDepth = AE.stack.length;\n' +
+  '      }', 'ALTER EGO i lavinen');
+rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aeD0: aeD0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
 rep('LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;',
   'LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;\n' +
-  '    AE = maniac && TIME.alterEgo ? { s: [1, 1, 1], c: [0, 0, 0] } : null;', 'AE vid bonusstart');
-rep('var ladIn = LADX ? { u: LADU, c: LADC } : null;', 'var ladIn = LADX ? { u: LADU, c: LADC } : null, aeIn = AE ? { s: AE.s.slice(), c: AE.c.slice() } : null;', 'AE per frispinn');
-rep('f.retrigger = f.scatters >= 3 ? more : 0; f.ladIn = ladIn;', 'f.retrigger = f.scatters >= 3 ? more : 0; f.ladIn = ladIn; f.aeIn = aeIn;', 'AE per frispinn (2)');
+  '    AE = maniac && TIME.alterEgo ? aeStart() : null;', 'ALTER EGO vid bonusstart');
 rep('var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;',
   'var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;\n' +
-  '    var aeEnd = AE ? AE.s.slice() : null; AE = null;', 'AE vid bonusslut');
-rep('return { lad: ladEnd, ladStart: ladS, maniac: maniac,', 'return { lad: ladEnd, ladStart: ladS, ae: aeEnd, maniac: maniac,', 'AE i bonusens resultat');
-// spelet: bilderna per steg, panelen och LEVEL UP (src/alter-ego.js), inkopplat i bonusflödet
+  '    AE = null;', 'ALTER EGO vid bonusslut');
+// spelet: gubbarna, dörrarna och panelen (src/alter-ego.js), inkopplat i bonusflödet
 var AE_JS = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego.js'), 'utf8');
 rep('  async function runFreeSpins(', AE_JS + '  async function runFreeSpins(', 'runFreeSpins');
 rep('    if (!document.body.classList.contains(\'fs\')) fsOn();\n', '    if (!document.body.classList.contains(\'fs\')) fsOn();\n    if (maniac && M.TIME.alterEgo) aeInit();\n', 'aeInit');
-rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeIn) { aeSprites(res.aeIn.s); aeRender(res.aeIn); }\n      await spinReels(res, true);\n      if (res.aeL0) aeCells(res.aeL0, res.aeW0);\n      // brädet syns en stund innan vinsterna visas', 'aeRender per frispinn');
-rep('      if (fs) await ladShow(st);\n', '      if (fs) await ladShow(st);\n      if (fs && st.ae) await aeShow(st);\n', 'aeShow');
-// ALTER EGO-lagren i spelet: rutan ritas med sina lagers bild (c.ae), vinsten river översta lagret (aePeel) i stället för
-// att spränga karaktären, och lagren följer med i lavinen (aeCells)
+rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
+// dörrarna syns när vinsten visas (symbolen ur lagret och LAYER-siffran på gubben)
+rep("      markCells(st.removed);\n      state.phase = 'show'; hud();", "      markCells(st.removed);\n      if (st.doors) aeDoors(st.doors);\n      state.phase = 'show'; hud();", 'dörrarna i vinsten');
+// gubbarna på brädet: rutan ritas med sitt stegs bild och ram (aeSwap, aeTile, aeMark), låsta gubbar står still när hjulen
+// snurrar (aeDrawLocked), gubbarna i en vinst levlar i stället för att sprängas (aeLevel) och lavinen faller förbi dem (aeCells)
 rep('  function drawCell(g, c, x, time, highlight) {\n    var y = c.y * cell;',
-  '  // ALTER EGO: en karaktär med egna lager (c.ae) ritas med sitt stegs bild, och en wild-karaktär får WILD-märket (src/alter-ego.js)\n' +
-  '  function drawCell(g, c, x, time, highlight) { var aeS = aeSwap(c); try { drawCell0(g, c, x, time, highlight); } finally { aeUnswap(aeS); } if (c.aeW) aeMark(g, c, x, highlight); }\n' +
-  '  function drawCell0(g, c, x, time, highlight) {\n    var y = c.y * cell;', 'rutans lager');
-rep('      popCells(st.removed);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', '      popCells(st.gone || st.removed);\n      if (st.peel) aePeel(st);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', 'lagren rivs');
-rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.aeN) aeCells(st.aeN, st.aeWN);\n', 'lagren i lavinen');
-rep('        var grow = st.wins.reduce(function (a, x) { return a + (x.deep || 0); }, 0);', '        var grow = st.wins.reduce(function (a, x) { return a + (x.deep || 0); }, 0) + (st.aeGrow || 0);', 'multin av rivna lager');
-// TEST-menyn: fliken Nytt med de fyra varianterna (gratis superbonus i varianten), som Pontus provar fram
-rep('  var TESTS = {\n', '  var TESTS = {\n    // ALTER EGO-lagren: en gratis superbonus i variant 0–3 (src/alter-ego.js, aeTest)\n' +
-  '    aeV0: function () { aeTest(0); }, aeV1: function () { aeTest(1); }, aeV2: function () { aeTest(2); }, aeV3: function () { aeTest(3); },\n', 'testknapparna');
+  '  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram, och en dörr visar symbolen ur lagret (src/alter-ego.js)\n' +
+  '  function drawCell(g, c, x, time, highlight) {\n' +
+  '    var aeS = aeSwap(c, x);\n' +
+  '    if (aeS) aeTile(g, c, x, highlight, aeS.k);\n' +
+  '    try { drawCell0(g, c, x, time, highlight); } finally { aeUnswap(aeS); }\n' +
+  '    if (aeS) aeMark(g, c, x, highlight, aeS.k);\n' +
+  '  }\n' +
+  '  function drawCell0(g, c, x, time, highlight) {\n    var y = c.y * cell;', 'gubbarna på brädet');
+rep('          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n      } else {',
+  '          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n        if (aeLockView) aeDrawLocked(g, r, x);\n      } else {', 'låsta gubbar under snurret');
+// de låsta gubbarna ritas sist, så att det som faller förbi dem i lavinen går bakom
+rep('        for (var i = 0; i < reel.cells.length; i++) drawCell(g, reel.cells[i], x, time, highlight);',
+  '        for (var i = 0; i < reel.cells.length; i++) if (!(reel.cells[i].ae >= 2)) drawCell(g, reel.cells[i], x, time, highlight);\n' +
+  '        for (var i2 = 0; i2 < reel.cells.length; i2++) if (reel.cells[i2].ae >= 2) drawCell(g, reel.cells[i2], x, time, highlight);', 'låsta gubbar överst');
+rep('      popCells(st.removed);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', '      popCells(st.gone || st.removed);\n      if (st.up) await aeLevel(st);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', 'gubbarna levlar');
+rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.aeN) aeCells(st.aeN, st.aeDepth);\n', 'gubbarna i lavinen');
+// TEST-menyn, fliken Nytt: en gratis superbonus
+rep('  var TESTS = {\n', '  var TESTS = {\n    // ALTER EGO: en gratis superbonus (src/alter-ego.js, aeNew)\n    aeGo: function () { TESTS.maniac(); },\n', 'testknappen');
 rep('  function nxNew() { return []; }', '  function nxNew() { return aeNew(); }', 'fliken Nytt');
 rep('    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', '    aeEnd();\n    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', 'aeEnd');
 rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
