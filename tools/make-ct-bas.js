@@ -126,7 +126,10 @@ rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 
 // 12x, 40 % under 100x, finalen står för cirka hälften, bästa hörnet når LAYER 1–5 i cirka 6, 12, 38, 16 och 27 % av
 // bonusarna (27 % ALTER EGO), maxvinsten 4 gånger på 7 500 köp. Snittet är detsamma som förut, så hela spelet och HUNT-
 // lägena påverkas inte.
-var CAL = { scale: 0.4489, fsScale: 3.527, maniacScale: 4.85 };
+// Med INFINITY efter LAYER 5 (tal på 12 % av rutorna): 116,7, 121,7 och 110,2 % vid 4,85 (2 500 köp var), alltså cirka
+// 3,98 för 96 %. INFINITY kommer i cirka 29 % av bonusarna och står för 10–28 % av vinsten (svänger mycket: x500 och
+// x1000 är sällsynta); medianen cirka 135x, maxvinsten cirka 1 på 600 köp.
+var CAL = { scale: 0.4489, fsScale: 3.527, maniacScale: 3.98 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
 // HUNT-lägena i köpmenyn: två bomber på hjul 1–6 och ingen på hjul 7, så att Bonusspelet kommer ungefär var 43:e snurr
 // (C&T: var 39:e). Med lagermodellen (2026-11-11, 80 000 snurr, grundspelet räknat om till scale 0,4489): grundspelet
@@ -181,8 +184,9 @@ rep('    var startGrid = grid;\n    for (;;) {',
   '    var startGrid = grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
 rep('      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }',
   '      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }\n' +
-  '      // superbonusens hörn: vinsten får summan av LAYER-numren för hörnen den går genom\n' +
-  '      if (aecOn) aecWins(ev);', 'hörnens multi');
+  '      // superbonusens hörn: vinsten får det högsta LAYER-numret bland hörnen den går genom; INFINITY: talen i rutorna\n' +
+  '      if (aecOn) aecWins(ev);\n' +
+  '      var aeInfUsed = opts.aeInf ? aecInfWins(ev, opts.aeInf) : null;', 'hörnens multi');
 rep('      var ev = layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);',
   '      var ev = aeOn ? aeEvaluate(grid) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
 rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });",
@@ -196,7 +200,8 @@ rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ typ
   '        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.lused = aeS.lused; aeSt.aeN = copyGrid(AE.L); aeSt.aePeek = copyGrid(AE.stack[0]);\n' +
   '      }\n' +
   '      // superbonusens hörn: aeCup = hörnen som levlade, aeC = hörnens LAYER efter steget\n' +
-  '      if (aecOn) { var aecSt = steps[steps.length - 1]; aecSt.aeCup = aecLevel(ev, grid); aecSt.aeC = AEC.lev.slice(); }', 'ALTER EGO i lavinen');
+  '      if (aecOn) { var aecSt = steps[steps.length - 1]; aecSt.aeCup = aecLevel(ev, grid); aecSt.aeC = AEC.lev.slice(); }\n' +
+  '      if (aeInfUsed) steps[steps.length - 1].aeInfUsed = aeInfUsed;', 'ALTER EGO i lavinen');
 rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
 // grundspelets snurr (också i HUNT-lägena) med omgångens egen vägg i stället för C&T:s vägg från förra omgången (Stake:
 // inget får följa med mellan omgångar)
@@ -222,7 +227,7 @@ rep('      await spinReels(res, true);\n      // brädet syns en stund innan vin
 rep('      state.fs.left--; renderMeter(); hud(); clearChips();', '      if (!plan.spins[si].aeFinal) state.fs.left--; renderMeter(); hud(); clearChips();', 'finalens lager räknas inte som frispinn');
 rep('      if (res.scatters >= 3) {', '      if (res.scatters >= 3 && !res.aeFinal) {', 'finalen utan nya frispinn');
 // hörnen levlar efter lavinsteget, och de ritas ovanpå brädet
-rep('      if (fs) await ladShow(st);\n', '      if (fs) await ladShow(st);\n      if (fs && st.aeC) await aecStep(st);\n', 'hörnen levlar');
+rep('      if (fs) await ladShow(st);\n', '      if (fs) await ladShow(st);\n      if (fs && (st.aeC || st.aeInfUsed)) await aecStep(st);\n', 'hörnen levlar');
 rep('    if (shade) { g.fillStyle = shade; g.fillRect(0, 0, boardPx, boardPx); }', '    if (aecView) aecDraw(g);\n    if (shade) { g.fillStyle = shade; g.fillRect(0, 0, boardPx, boardPx); }', 'hörnen på brädet');
 rep('      await spinReels(res, false);\n      await presentSteps(res, false);', '      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, false);\n      if (res.aeL0) aeLanded(res);\n      await presentSteps(res, false);', 'ALTER EGO i grundspelet');
 // grundspelet: när omgången är slut syns inga låsta gubbar eller zoner (inget får se ut att följa med till nästa omgång)

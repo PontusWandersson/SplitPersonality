@@ -230,5 +230,35 @@
       f.retrigger = 0; f.aeFinal = d; f.aeDepth = D; f.aeC0 = AEC.lev.slice();
       out.push(f); x += f.x;
     }
+    // INFINITY (Pontus 2026-11-11: "gräddet på moset", "Ja, bygg INFINITY"): efter LAYER 5, bara när ett hörn nådde mitten.
+    // Ett sista bräde där AEC_INF_P av rutorna har ett tal (C&T:s INFINITY-tal och vikter). En vinst gångras med summan av
+    // talen i sina rutor (minst x1); ett tal som har använts i en vinst försvinner. Talen sitter på rutorna, inte på
+    // symbolerna, och står kvar när lavinen faller.
+    if (D >= 5 && x0 + x < TIME.maxX) {
+      var V = [];
+      for (var r = 0; r < REELS; r++) { V.push([]); for (var y = 0; y < ROWS; y++) V[r].push(rng() < AEC_INF_P ? drawW(rng, AEC_INF_DRAW) : 0); }
+      var V0 = V.map(function (col) { return col.slice(); });
+      var fi = playRound(rng, { fs: true, fsMult: 1, layers: [emptyGrid()], depth: 1, payScale: scale, place: place, aeFinal: 6, aeInf: V });
+      fi.retrigger = 0; fi.aeFinal = 6; fi.aeDepth = D; fi.aeC0 = AEC.lev.slice(); fi.aeInfV0 = V0;
+      out.push(fi);
+    }
     return out;
+  }
+  // AEC_INF_P: andelen rutor med tal. C&T:s 0,3 gav INFINITY i snitt cirka 2 000x och 80 % av hela bonusen; 0,1 cirka
+  // 160x (9 %), 0,15 cirka 670x (34 %), så 0,12 (simulerat 2026-11-11, 800 köp per värde).
+  var AEC_INF_P = 0.12, AEC_INF_DRAW = { v: [2, 3, 5, 10, 25, 50, 100, 500, 1000], w: [30, 25, 20, 13, 7, 3, 1.5, 0.4, 0.1] };
+  // INFINITY-vinsterna: varje vinst gångras med summan av talen i sina rutor (aeInfK; minst x1). Talen som användes
+  // försvinner efter steget. Svarar rutorna vars tal användes ({ r, y, v }).
+  function aecInfWins(ev, V) {
+    var used = {}, list = [], total = 0;
+    ev.wins.forEach(function (w) {
+      var sum = 0, cells = [];
+      w.cols.forEach(function (rows, r) { rows.forEach(function (y) { var v = V[r][y]; if (v > 0) { sum += v; cells.push({ r: r, y: y, v: v }); } }); });
+      var m = Math.max(1, sum);
+      w.x *= m; w.aeInfK = m; total += w.x;
+      cells.forEach(function (c) { var key = c.r + ',' + c.y; if (!used[key]) { used[key] = true; list.push(c); } });
+    });
+    list.forEach(function (c) { V[c.r][c.y] = 0; });
+    ev.x = total;
+    return list;
   }

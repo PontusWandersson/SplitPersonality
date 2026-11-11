@@ -319,13 +319,14 @@
   }
   function aeFacts() {
     return '<p><b>Fyra hörn = LAYER 1–4.</b> Vinner hörnets gubbe levlar hörnet och går in mot mitten (två steg om vinsten är i hörnet). Vinster genom ett hörn får hörnets LAYER i multi.</p>' +
-      '<p>Mitten = <b>LAYER 5, ALTER EGO</b>. Efter sista frispinnet <b>rivs väggen</b>: lika många lager som bästa hörnet nådde, LAYER 1 = x2 … LAYER 5 = x10</p>';
+      '<p>Mitten = <b>LAYER 5, ALTER EGO</b>. Efter sista frispinnet <b>rivs väggen</b>: lika många lager som bästa hörnet nådde, LAYER 1 = x2 … LAYER 5 = x10. Nådde ett hörn mitten kommer sist <b>INFINITY</b>: rutor med tal upp till x1000</p>';
   }
   function aeRule() {
     return '<li>' + txl('Grundspelet: varje snurr har sin egen vägg (LAYER 1–5 bakom brädet), och inget följer med mellan omgångarna. Killen, Katten och Växten i en vinst levlar och låses under lavinerna i snurret, och rutorna runt en låst gubbe kan hämta en saknad symbol ur lagren.') + '</li>' +
       '<li>' + txl('ALTER EGO, frispinnen: fyra hörn på 3×3 rutor med var sin gubbe (Killen, Katten, Växten och A) börjar på LAYER 1. När hörnets gubbe vinner levlar hörnet ett steg, två om vinsten har en av gubbens rutor inne i hörnet (per lavin), och hörnet flyttar in mot mitten. LAYER 5 är mitten: ALTER EGO.') + '</li>' +
       '<li>' + txl('En vinst som går genom ett eller flera hörn får det högsta av hörnens LAYER i multi (LAYER 3 = x3).') + '</li>' +
-      '<li>' + txl('Finalen efter sista frispinnet: väggen rivs. Du får lika många lager som det bästa hörnet nådde. Varje lager spelas som ett eget bräde med dubbla sitt nummer i multi (LAYER 1 = x2, LAYER 3 = x6, LAYER 5 = x10), med hörnens gubbar i hörnens mitt. Nådde ett hörn mitten står en WILD i brädets mitt.') + '</li>';
+      '<li>' + txl('Finalen efter sista frispinnet: väggen rivs. Du får lika många lager som det bästa hörnet nådde. Varje lager spelas som ett eget bräde med dubbla sitt nummer i multi (LAYER 1 = x2, LAYER 3 = x6, LAYER 5 = x10), med hörnens gubbar i hörnens mitt. Nådde ett hörn mitten står en WILD i brädets mitt.') + '</li>' +
+      '<li>' + txl('INFINITY: nådde ett hörn mitten kommer ett sista bräde efter LAYER 5. Ungefär var tredje ruta har ett tal (x2, x3, x5, x10, x25, x50, x100, x500 eller x1000). En vinst gångras med summan av talen i sina rutor, och ett tal som har använts försvinner.') + '</li>';
 
   }
 
@@ -341,6 +342,7 @@
   function aecPosOf(i, lev) { var q = M.AEC_PATH[i][Math.max(1, Math.min(5, lev)) - 1]; return { c: q[0], r: q[1] }; }
   function aecSprOf(i, lev) { var sym = M.AEC_SYM[i]; return (AE_IMG[sym] && aeSpr(sym, lev)) || sprites[sym]; }
   function aecDraw(g) {
+    if (aecView && aecView.final === 6) { aecInfDraw(g); return; }
     if (!aecView || aecView.final) return;
     var t = aecView.t0 != null ? Math.min(1, (clock - aecView.t0) / 0.5) : 1, e = 1 - Math.pow(1 - t, 3);
     for (var i = 0; i < 4; i++) {
@@ -376,6 +378,12 @@
     if (res.aeFinal) {
       if (!aecView) aecView = { lev: res.aeC0.slice(), from: res.aeC0.slice(), flash: [] };
       aecView.final = res.aeFinal; aecView.depth = res.aeDepth; aecPanel();
+      if (res.aeFinal === 6) {
+        // INFINITY: talen sitter på rutorna (aecView.inf), hit = när ett tal användes i en vinst
+        aecView.inf = res.aeInfV0.map(function (col) { return col.slice(); }); aecView.infHit = {};
+        await aecCard('INFINITY', '∞', true);
+        return;
+      }
       await aecCard(res.aeFinal === 1 ? 'RIV VÄGGEN!' : '', 'LAYER ' + res.aeFinal + ' · x' + 2 * res.aeFinal, res.aeFinal >= 5);
       return;
     }
@@ -384,7 +392,15 @@
   }
   // efter ett lavinsteg: hörnen som levlade glider ett steg in, och ett kort visar hörnets nya LAYER
   async function aecStep(st) {
-    if (!aecView || aecView.final) return;
+    if (aecView && aecView.final === 6 && st.aeInfUsed) {
+      // INFINITY: talen som vinsten använde visas en stund och försvinner sedan; kortet visar vinstens största tal
+      var best = 1;
+      st.wins.forEach(function (w) { if (w.aeInfK > best) best = w.aeInfK; });
+      if (best > 1) await aecCard('INFINITY', 'x' + best, true);
+      st.aeInfUsed.forEach(function (c) { if (aecView.inf) aecView.inf[c.r][c.y] = 0; });
+      return;
+    }
+    if (!aecView || aecView.final || !st.aeC) return;
     aecView.from = aecView.lev.slice(); aecView.lev = st.aeC.slice(); aecView.t0 = clock;
     aecPanel();
     for (var j = 0; j < st.aeCup.length; j++) {
@@ -395,6 +411,7 @@
   }
   // vinsten: hörnen som vinsten går genom blinkar (deras LAYER är vinstens multi)
   function aecWinShow(st) {
+    if (aecView && aecView.final === 6 && st.aeInfUsed) { st.aeInfUsed.forEach(function (c) { aecView.infHit[c.r + ',' + c.y] = clock; }); return; }
     if (!aecView || aecView.final) return;
     st.wins.forEach(function (w) { (w.aeTouch || []).forEach(function (i) { aecView.flash[i] = clock; }); });
   }
@@ -433,8 +450,25 @@
       row.querySelectorAll('.ae-pips i').forEach(function (q, j) { q.style.background = j < lv ? AEC_FARG[j + 1] : ''; });
       row.classList.toggle('max', lv >= 5);
     }
-    aecEl.querySelector('.ae-fin').textContent = aecView.final ? 'RIVER LAYER ' + aecView.final + ' AV ' + aecView.depth :
-      'FINALEN: LAYER 1–' + D + (D >= 5 ? ' + WILD' : '');
+    aecEl.querySelector('.ae-fin').textContent = aecView.final === 6 ? 'INFINITY' : aecView.final ? 'RIVER LAYER ' + aecView.final + ' AV ' + aecView.depth :
+      'FINALEN: LAYER 1–' + D + (D >= 5 ? ' + INFINITY' : '');
+  }
+  // INFINITY: talen på rutorna, som guldbrickor nere i hörnet (lyser upp när en vinst använder dem)
+  function aecInfDraw(g) {
+    var V = aecView.inf;
+    if (!V) return;
+    for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) {
+      var v = V[r][y];
+      if (!v) continue;
+      var hit = aecView.infHit[r + ',' + y], k = hit != null ? Math.max(0, 1 - (clock - hit) / 0.8) : 0;
+      var bw = cell * (0.52 + 0.12 * k), bh = cell * (0.24 + 0.06 * k), bx = r * cell + cell - bw - cell * 0.04, by = y * cell + cell - bh - cell * 0.04;
+      g.save();
+      g.fillStyle = v >= 100 ? '#ff3b3b' : v >= 25 ? '#b45cff' : AE_PIP_MAX; g.strokeStyle = INK; g.lineWidth = Math.max(1.5, cell * 0.03);
+      rr(g, bx, by, bw, bh, bh * 0.45); g.fill(); g.stroke();
+      g.fillStyle = v >= 25 ? '#fff6e0' : INK; g.font = Math.round(bh * 0.78) + 'px ' + DISPLAY; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('x' + v, bx + bw / 2, by + bh * 0.56);
+      g.restore();
+    }
   }
   function aecInit() {
     aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
