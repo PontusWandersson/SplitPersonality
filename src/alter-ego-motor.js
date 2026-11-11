@@ -166,3 +166,69 @@
     try { return playRound(rng, { fs: true, fsMult: 1, layers: [emptyGrid()], depth: 1, payScale: TIME.maniacScale }); }
     finally { AE = keep; }
   }
+  // ================================================================ ALTER EGO-superbonusen: fyra hörn och väggen
+  // Pontus 2026-11-11 ("Bygg denna matten så får vi kolla på det och se hur det känns"). Hela bonusen är en omgång (Stake).
+  // Akt 1, frispinnen: fyra hörn på 3x3 rutor med var sin gubbe (AEC_SYM: Killen, Katten, Växten och A). Alla börjar på
+  // LAYER 1. När hörnets gubbe vinner levlar hörnet ett steg, två om vinsten har en av gubbens rutor inne i hörnet, och
+  // hörnet flyttar in mot mitten (AEC_PATH). LAYER 5 är mitten: ALTER EGO. Varje vinst får det högsta LAYER-numret bland
+  // hörnen den går genom som multi.
+  // Akt 2, finalen efter sista frispinnet: väggen rivs. Lika många lager som det bästa hörnet nådde; lager d spelas som ett
+  // eget bräde (frispinnens hjul) med x(2d). Varje hörns gubbe står i mitten av sitt hörn på varje lager, och nådde ett hörn
+  // mitten (ALTER EGO) står en WILD i brädets mitt.
+  var AEC_SYM = [2, 3, 4, 8];
+  // hörnets övre vänstra ruta (hjul, rad) för LAYER 1–5
+  var AEC_PATH = [
+    [[0, 0], [1, 0], [1, 1], [2, 1], [2, 2]],
+    [[4, 0], [3, 0], [3, 1], [2, 1], [2, 2]],
+    [[0, 4], [1, 4], [1, 3], [2, 3], [2, 2]],
+    [[4, 4], [3, 4], [3, 3], [2, 3], [2, 2]]
+  ];
+  var AEC = null;   // under superbonusen: { lev: [4] } hörnens LAYER
+  function aecPos(i) { var p = AEC_PATH[i][Math.min(5, AEC.lev[i]) - 1]; return { c: p[0], r: p[1] }; }
+  function aecIn(i, r, y) { var p = aecPos(i); return r >= p.c && r < p.c + 3 && y >= p.r && y < p.r + 3; }
+  // vinsternas multi: det högsta LAYER-numret bland hörnen vinsten går genom (aeMul, aeTouch). (Först summan: mer multi i
+  // akt 1 och för lite kvar till finalen, som då bara stod för 5–10 % av bonusen.)
+  function aecWins(ev) {
+    var total = 0;
+    ev.wins.forEach(function (w) {
+      var m = 1, touch = [];
+      for (var i = 0; i < 4; i++) {
+        var hit = false;
+        w.cols.forEach(function (rows, r) { rows.forEach(function (y) { if (aecIn(i, r, y)) hit = true; }); });
+        if (hit) { m = Math.max(m, AEC.lev[i]); touch.push(i); }
+      }
+      w.x *= m; w.aeMul = m; w.aeTouch = touch; total += w.x;
+    });
+    ev.x = total;
+  }
+  // hörnen som levlar efter ett lavinsteg: +1 när hörnets gubbe vinner var som helst, och +1 till när vinsten har en av
+  // gubbens rutor inne i hörnet (högst +2 per lavinsteg, högst LAYER 5). Svarar hörnen som levlade.
+  // (Först bara en ruta inne i hörnet: de högra hörnen nås bara av vinster över minst fem hjul, hörnen levlade 1,5 gånger
+  // per bonus och ALTER EGO nåddes i 0,5 %. Bara var som helst: 3 %. Med båda: 27 %.)
+  function aecLevel(ev, grid) {
+    var up = [];
+    for (var i = 0; i < 4; i++) {
+      if (AEC.lev[i] >= 5) continue;
+      var s = AEC_SYM[i], hit = false, hitIn = false;
+      ev.wins.forEach(function (w) {
+        if (w.sym !== s) return;
+        w.cols.forEach(function (rows, r) { rows.forEach(function (y) { if (grid[r][y] === s) { hit = true; if (aecIn(i, r, y)) hitIn = true; } }); });
+      });
+      if (hit) { AEC.lev[i] = Math.min(5, AEC.lev[i] + (hitIn ? 2 : 1)); up.push(i); }
+    }
+    return up;
+  }
+  // finalen: lager d = ett eget bräde med x(2d) (bonusens vinsttabell; LAYER 1 x2 … LAYER 5 x10), hörnens gubbar
+  // placerade, WILD i mitten vid ALTER EGO. (Med x d stod finalen för 31 % av bonusen, med x(2d) 47 %.)
+  var AEC_FINMUL = 2;
+  function aecFinal(rng, scale, x0, x) {
+    var out = [], D = Math.max.apply(null, AEC.lev), place = [];
+    for (var i = 0; i < 4; i++) { var p = aecPos(i); place.push({ r: p.c + 1, y: p.r + 1, sym: AEC_SYM[i] }); }
+    if (D >= 5) place.push({ r: 3, y: 3, sym: W });
+    for (var d = 1; d <= D && x0 + x < TIME.maxX; d++) {
+      var f = playRound(rng, { fs: true, fsMult: AEC_FINMUL * d, layers: [emptyGrid()], depth: 1, payScale: scale, place: place, aeFinal: d });
+      f.retrigger = 0; f.aeFinal = d; f.aeDepth = D; f.aeC0 = AEC.lev.slice();
+      out.push(f); x += f.x;
+    }
+    return out;
+  }

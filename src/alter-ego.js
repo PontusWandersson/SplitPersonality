@@ -301,8 +301,7 @@
 
   // ---- TEST-menyn, bonusens startkort och reglerna
   function aeNew() {
-    return [['aeMode', 'ALTER EGO-läge (på/av)', 'Varje vanligt snurr spelas som i superbonusen: de låsta gubbarna står kvar mellan snurren. Ingen bonusstart. Tryck igen för att stänga av.'],
-      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och rutorna runt dem ser ner i lagren.']];
+    return [['aeGo', 'ALTER EGO: gratis superbonus', 'Fyra hörn levlar mot mitten, och i finalen rivs väggen lager för lager.']];
   }
   // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
   // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och de låsta gubbarna står kvar mellan
@@ -319,13 +318,126 @@
     return { version: M.ENGINE_VERSION, thr: null, base: r, bonus: null, rawX: r.x, x: Math.min(r.x, M.TIME.maxX), capped: r.x >= M.TIME.maxX, wallOut: hist };
   }
   function aeFacts() {
-    return '<p><b>Vinst = levla och låsas.</b> Killen, Katten och Växten sprängs inte: de blir nästa gubbe och står kvar hela bonusen.</p>' +
-      '<p>Rutorna runt en låst gubbe <b>ser ner i lagren</b> och vinner också med symbolerna där. <b>ALTER EGO når alla fem</b></p>';
+    return '<p><b>Fyra hörn = LAYER 1–4.</b> Vinner hörnets gubbe levlar hörnet och går in mot mitten (två steg om vinsten är i hörnet). Vinster genom ett hörn får hörnets LAYER i multi.</p>' +
+      '<p>Mitten = <b>LAYER 5, ALTER EGO</b>. Efter sista frispinnet <b>rivs väggen</b>: lika många lager som bästa hörnet nådde, LAYER 1 = x2 … LAYER 5 = x10</p>';
   }
   function aeRule() {
-    return '<li>' + txl('Varje omgång har sin egen vägg: LAYER 1–5 bakom brädet. Varje lavin lägger in brädet den sprängde som nytt LAYER 1. Inget följer med mellan omgångarna.') + '</li>' +
-      '<li>' + txl('Killen, Katten och Växten i en vinst sprängs inte. De blir nästa gubbe (steg 2–5) och låses, en per hjul (en gubbe till på samma hjul sprängs som vanligt). I grundspelet står de kvar under lavinerna i snurret, i superbonusen hela bonusen.') + '</li>' +
-      '<li>' + txl('Rutorna runt en låst gubbe ser ner i lagren: där räknas en ruta som sin egen symbol plus symbolerna i lagren bakom den. Steg 2 når LAYER 1, steg 3 LAYER 1–2, steg 4 LAYER 1–3 och steg 5 (ALTER EGO) alla fem, två varv runt gubben. En symbol ur ett lager kan bara användas en gång.') + '</li>' +
-      '<li>' + txl('En vinst räknas bara om den har minst en ny symbol (en symbol som inte är låst, eller en ur ett lager).') + '</li>';
+    return '<li>' + txl('Grundspelet: varje snurr har sin egen vägg (LAYER 1–5 bakom brädet), och inget följer med mellan omgångarna. Killen, Katten och Växten i en vinst levlar och låses under lavinerna i snurret, och rutorna runt en låst gubbe kan hämta en saknad symbol ur lagren.') + '</li>' +
+      '<li>' + txl('ALTER EGO, frispinnen: fyra hörn på 3×3 rutor med var sin gubbe (Killen, Katten, Växten och A) börjar på LAYER 1. När hörnets gubbe vinner levlar hörnet ett steg, två om vinsten har en av gubbens rutor inne i hörnet (per lavin), och hörnet flyttar in mot mitten. LAYER 5 är mitten: ALTER EGO.') + '</li>' +
+      '<li>' + txl('En vinst som går genom ett eller flera hörn får det högsta av hörnens LAYER i multi (LAYER 3 = x3).') + '</li>' +
+      '<li>' + txl('Finalen efter sista frispinnet: väggen rivs. Du får lika många lager som det bästa hörnet nådde. Varje lager spelas som ett eget bräde med dubbla sitt nummer i multi (LAYER 1 = x2, LAYER 3 = x6, LAYER 5 = x10), med hörnens gubbar i hörnens mitt. Nådde ett hörn mitten står en WILD i brädets mitt.') + '</li>';
+
   }
 
+
+  // ================================================================ superbonusen: fyra hörn och väggen
+  // Matten i src/alter-ego-motor.js (AEC). Här: hörnen ritas ovanpå brädet (3x3 rutor i lagrets färg med gubben och
+  // LAYER-siffran) och glider in mot mitten när de levlar, vinsterna genom dem blinkar, panelen visar hörnens LAYER och
+  // finalen visar vilket lager som rivs.
+  var AEC_FARG = AE_LAYER_FARG;   // LAYER 1 blå, 2 grön, 3 röd, 4 lila, 5 gul (ALTER EGO)
+  var AEC_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN', 'A'];
+  // aecView: { lev: hörnens LAYER, from: förra LAYER (glidningen), t0, flash: när hörnet blinkade, final: lagret som rivs }
+  var aecView = null, aecEl = null;
+  function aecPosOf(i, lev) { var q = M.AEC_PATH[i][Math.max(1, Math.min(5, lev)) - 1]; return { c: q[0], r: q[1] }; }
+  function aecSprOf(i, lev) { var sym = M.AEC_SYM[i]; return (AE_IMG[sym] && aeSpr(sym, lev)) || sprites[sym]; }
+  function aecDraw(g) {
+    if (!aecView || aecView.final) return;
+    var t = aecView.t0 != null ? Math.min(1, (clock - aecView.t0) / 0.5) : 1, e = 1 - Math.pow(1 - t, 3);
+    for (var i = 0; i < 4; i++) {
+      var a = aecPosOf(i, aecView.from[i]), b = aecPosOf(i, aecView.lev[i]);
+      var cx = (a.c + (b.c - a.c) * e) * cell, cy = (a.r + (b.r - a.r) * e) * cell, w = cell * 3;
+      var lv = aecView.lev[i], col = AEC_FARG[lv] || AE_PIP;
+      var fl = aecView.flash[i] != null ? Math.max(0, 1 - (clock - aecView.flash[i]) / 0.9) : 0;
+      g.save();
+      g.globalAlpha = 0.08 + 0.18 * fl; g.fillStyle = col; rr(g, cx + 3, cy + 3, w - 6, w - 6, cell * 0.2); g.fill();
+      g.globalAlpha = 0.9; g.strokeStyle = col; g.lineWidth = Math.max(2, cell * (0.045 + 0.05 * fl));
+      rr(g, cx + 3, cy + 3, w - 6, w - 6, cell * 0.2); g.stroke();
+      // etiketten: gubben och LAYER (multi)
+      var lh = cell * 0.3, lw = cell * 1.6, lx = cx + cell * 0.12, ly = cy + cell * 0.1;
+      g.globalAlpha = 1; g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = Math.max(1.5, cell * 0.025);
+      rr(g, lx, ly, lw, lh, lh * 0.4); g.fill(); g.stroke();
+      var spr = aecSprOf(i, lv); if (spr) g.drawImage(spr, lx - lh * 0.2, ly - lh * 0.35, lh * 1.6, lh * 1.6);
+      g.fillStyle = INK; g.font = Math.round(lh * 0.62) + 'px ' + DISPLAY; g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillText(lv >= 5 ? 'ALTER EGO' : 'LAYER ' + lv + '  x' + lv, lx + lh * 1.45, ly + lh * 0.56);
+      g.restore();
+    }
+  }
+  // kortet mitt på brädet (hörnet levlar, finalens lager)
+  function aecCard(top, main, gold, sym, k) {
+    var fx = document.createElement('div'); fx.className = 'ae-fx';
+    var img = sym != null && AE_SRC[sym] ? '<img alt="" src="' + AE_SRC[sym][Math.max(1, Math.min(5, k)) - 1] + '">' : '';
+    fx.innerHTML = '<div class="ae-card' + (gold ? ' max' : '') + '">' + img + (top ? '<i>' + top + '</i>' : '') + '<b>' + main + '</b></div>';
+    (document.getElementById('frame') || document.body).appendChild(fx);
+    return wait(showTime(gold ? 1.5 : 1.0)).then(function () { fx.remove(); });
+  }
+  // ett frispinn börjar: hörnens läge, eller finalens lager (ett kort: RIV VÄGGEN! och lagret med sin multi)
+  async function aecSpinStart(res) {
+    aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
+    if (res.aeFinal) {
+      if (!aecView) aecView = { lev: res.aeC0.slice(), from: res.aeC0.slice(), flash: [] };
+      aecView.final = res.aeFinal; aecView.depth = res.aeDepth; aecPanel();
+      await aecCard(res.aeFinal === 1 ? 'RIV VÄGGEN!' : '', 'LAYER ' + res.aeFinal + ' · x' + 2 * res.aeFinal, res.aeFinal >= 5);
+      return;
+    }
+    aecView = { lev: res.aeC0.slice(), from: res.aeC0.slice(), flash: [], t0: null };
+    aecPanel();
+  }
+  // efter ett lavinsteg: hörnen som levlade glider ett steg in, och ett kort visar hörnets nya LAYER
+  async function aecStep(st) {
+    if (!aecView || aecView.final) return;
+    aecView.from = aecView.lev.slice(); aecView.lev = st.aeC.slice(); aecView.t0 = clock;
+    aecPanel();
+    for (var j = 0; j < st.aeCup.length; j++) {
+      var i = st.aeCup[j], k = st.aeC[i];
+      aecView.flash[i] = clock;
+      await aecCard(AEC_NAMN[i], k >= 5 ? 'ALTER EGO!' : 'LAYER ' + k, k >= 5, M.AEC_SYM[i], k);
+    }
+  }
+  // vinsten: hörnen som vinsten går genom blinkar (deras LAYER är vinstens multi)
+  function aecWinShow(st) {
+    if (!aecView || aecView.final) return;
+    st.wins.forEach(function (w) { (w.aeTouch || []).forEach(function (i) { aecView.flash[i] = clock; }); });
+  }
+  // panelen: hörnens LAYER och finalen
+  function aecBuild() {
+    aeCss();
+    if (!document.getElementById('aecCss')) {
+      var css = document.createElement('style'); css.id = 'aecCss';
+      css.textContent = '.ae-fin { font-family: var(--display, "Bangers", Impact, sans-serif); font-size: 17px; letter-spacing: .05em; text-align: center; color: #ffd21f; }' +
+        '.ae-card i { font-style: normal; font-family: var(--display, "Bangers", Impact, sans-serif); font-size: 34px; letter-spacing: .05em; color: #ff8629; -webkit-text-stroke: 2px #15111f; paint-order: stroke fill; }' +
+        '.portrait #aecPanel { grid-template-columns: repeat(4, minmax(0, 1fr)); } .portrait .ae-fin { grid-column: 1 / -1; font-size: 12px; }';
+      document.head.appendChild(css);
+    }
+    if (aecEl) return aecEl;
+    aecEl = document.createElement('section'); aecEl.className = 'ae-panel'; aecEl.id = 'aecPanel'; aecEl.hidden = true;
+    aecEl.innerHTML = '<div class="ae-title">ALTER EGO</div>' + [0, 1, 2, 3].map(function (i) {
+      return '<div class="ae-row" data-i="' + i + '"><img alt=""><div><div class="ae-name">' + AEC_NAMN[i] + '</div><div class="ae-step"></div>' +
+        '<div class="ae-pips"><i></i><i></i><i></i><i></i><i></i></div></div></div>';
+    }).join('') + '<div class="ae-fin"></div>';
+    return aecEl;
+  }
+  function aecPlace() {
+    var el3 = aecBuild(), portrait = document.documentElement.classList.contains('portrait');
+    var home = document.getElementById(portrait ? 'machine' : 'right');
+    if (home && el3.parentNode !== home) { if (portrait) home.appendChild(el3); else home.insertBefore(el3, home.firstChild); }
+  }
+  function aecPanel() {
+    if (!aecEl || aecEl.hidden || !aecView) return;
+    aecPlace();
+    var rows = aecEl.querySelectorAll('.ae-row'), D = Math.max.apply(null, aecView.lev);
+    for (var i = 0; i < 4; i++) {
+      var lv = aecView.lev[i], sym = M.AEC_SYM[i], row = rows[i], img = row.querySelector('img');
+      var src = AE_SRC[sym] ? AE_SRC[sym][lv - 1] : symRawSrc(sym);
+      if (src && img.getAttribute('src') !== src) img.setAttribute('src', src);
+      row.querySelector('.ae-step').textContent = lv >= 5 ? 'ALTER EGO · LAYER 5' : 'LAYER ' + lv + ' · x' + lv;
+      row.querySelectorAll('.ae-pips i').forEach(function (q, j) { q.style.background = j < lv ? AEC_FARG[j + 1] : ''; });
+      row.classList.toggle('max', lv >= 5);
+    }
+    aecEl.querySelector('.ae-fin').textContent = aecView.final ? 'RIVER LAYER ' + aecView.final + ' AV ' + aecView.depth :
+      'FINALEN: LAYER 1–' + D + (D >= 5 ? ' + WILD' : '');
+  }
+  function aecInit() {
+    aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
+    aecView = { lev: [1, 1, 1, 1], from: [1, 1, 1, 1], flash: [] }; aecPanel();
+  }
+  function aecEnd() { aecView = null; if (aecEl) aecEl.hidden = true; document.querySelectorAll('.ae-fx').forEach(function (f) { f.remove(); }); }
