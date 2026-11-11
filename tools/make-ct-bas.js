@@ -165,7 +165,12 @@ rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i g
 rep('  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 3];', '  HUNT_BLOCKS[1] = [2, 2, 2, 2, 2, 2, 0];', 'bomberna i HUNT-lägena');
 rep("    hunt: { price: 3, strips: 'hunt' },\n    inf: { price: 14, strips: 'hunt', inf: true },", "    hunt: { price: 2.81, strips: 'hunt' },\n    inf: { price: 12.67, strips: 'hunt', inf: true },", 'HUNT-lägenas priser');
 rep('var MODE_RTP = { hunt: 96.6, inf: 95.8, lay3: 96.5 };', 'var MODE_RTP = { hunt: 96.3, inf: 96.0, lay3: 96.5 };', 'HUNT-lägenas återbetalning');
-rep("document.title = 'C&T Maniac';", "document.title = 'ALTER EGO';", 'fliktiteln');
+// spelets namn (Pontus 2026-11-11: SPLIT PERSONALITY, "Ja, byt namn"; superbonusen heter ALTER EGO kvar): fliken och
+// loggans text (loggan är C&T:s bild, som är bortplockad, så texten syns bara utan bilder och för skärmläsare)
+rep("document.title = 'C&T Maniac';", "document.title = 'SPLIT PERSONALITY';", 'fliktiteln');
+rep('<span class="l-c">C</span><span class="l-amp">&amp;</span><span class="l-t">T</span><span class="l-m">MANIAC</span>',
+  '<span class="l-c">SPLIT</span><span class="l-m">PERSONALITY</span>', 'loggans text', true);
+rep('aria-label="C&amp;T Maniac"', 'aria-label="SPLIT PERSONALITY"', 'loggans namn');
 // inget ljud alls (Pontus 2026-11-10: "Ta bort allt ljud"): ljudmotorn startar aldrig, som i en webbläsare utan Web Audio
 // (C&T:s kod klarar det: alla ljud kollar Sound.ctx). Ljudknappen står kvar men gör inget hörbart; ljudfilerna hämtas inte.
 rep('      var AC = window.AudioContext || window.webkitAudioContext;\n      if (!AC) return;', '      return;   // ALTER EGO: inget ljud', 'ljudmotorn');
@@ -379,7 +384,7 @@ rep("{ lsEl = document.createElement('div'); lsEl.className = 'ld-ls'; lsEl.inne
 // rakt in i spelet: inget ODD HEAD-intro och ingen startskärm med "Hur man spelar" (C&T:s egen brytare; Pontus
 // 2026-11-10: "ta bort introt och 'hur man spelar' nu när vi ska börja bygga produkten"). Reglerna finns kvar i menyn.
 rep('var INTRO_PAUSAT = false;', 'var INTRO_PAUSAT = true;', 'INTRO_PAUSAT');
-h = h.replace(/<title>[^<]*<\/title>/, '<title>ALTER EGO</title>');
+h = h.replace(/<title>[^<]*<\/title>/, '<title>SPLIT PERSONALITY</title>');
 // egna sparnycklar (C&T:s sparade 6x6-väggar och omgångar får inte läsas av 7x7-brädet)
 var nKey = rep("'ctm.", "'alterego7.", 'sparnycklarna', true);
 console.log('sparnycklar bytta: ' + nKey);
