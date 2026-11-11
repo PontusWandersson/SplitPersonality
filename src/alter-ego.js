@@ -180,12 +180,11 @@
       c.ae = (L[r] && L[r][y]) || 0; c.aeDoor = null;
     }
     if (peek) aePeekG = peek.map(function (col) { return col.slice(); });
-    aeZoneCalc(); aePanel();
+    aeZoneCalc();
   }
   // ett nytt snurr (grundspelet) eller frispinn: de låsta gubbarna står kvar medan hjulen snurrar
   function aeSpinStart(res) {
-    aeBuild(); aePlace(); aeEl.hidden = false;
-    aeLockView = { L: res.aeL0, G: res.startGrid }; aeZ = null; aePanel();
+    aeLockView = { L: res.aeL0, G: res.startGrid }; aeZ = null;
   }
   function aeLanded(res) { aeLockView = null; aeCells(res.aeL0, res.aePeek0); }
   // vinsten: rutorna där vinsten tar en symbol ur ett lager lyser och visar symbolen och lagret
@@ -198,116 +197,34 @@
     });
   }
   // gubbarna i vinsten levlar (de sprängs inte): ny bild och ram, en studs och en ring i färgen för hur djupt de når;
-  // når en gubbe ALTER EGO (steg 5) visas kortet
+  // (inget kort, ingen panel)
   async function aeLevel(st) {
     reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.aeDoor = null; }); });
-    var top = null;
     st.up.forEach(function (u) {
       var c = reels[u.r] && reels[u.r].cells[u.y];
       if (!c) return;
       c.ae = u.k; c.tagIn = 0;
       parts.push({ kind: 'ring', x: u.r * cell + cell / 2, y: u.y * cell + cell / 2, life: 0, max: 0.35, c: AE_LAYER_FARG[aeNar(u.k)] || AE_PIP });
-      if (u.k >= 5 && !top) top = c.sym;
     });
-    aeZoneCalc(); aePanel();
-    if (top != null) await aeCard(AE_SYM.indexOf(top), true);
+    aeZoneCalc();
   }
   // grundspelets omgång är slut: inga låsta gubbar eller zoner syns (inget ska se ut att följa med till nästa omgång)
   function aeRoundEnd() {
     if (state.fs) return;
     reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; c.aeDoor = null; }); });
-    aeLockView = null; aeZ = null; aePeekG = null; aePanel();
+    aeLockView = null; aeZ = null; aePeekG = null;
   }
-  function aeCard(i, max) {
-    var fx = document.createElement('div'); fx.className = 'ae-fx';
-    fx.innerHTML = '<div class="ae-card' + (max ? ' max' : '') + '"><img alt="" src="' + AE_SRC[AE_SYM[i]][4] + '"><b>' + AE_NAMN[i] + ' · ALTER EGO!</b></div>';
-    (document.getElementById('frame') || document.body).appendChild(fx);
-    return wait(showTime(1.6)).then(function () { fx.remove(); });
-  }
-
-  // ---- panelen: på datorn i högerspalten, på telefonen under knapparna (bara under superbonusen)
-  var aeEl = null;
-  function aeCss() {
-    if (document.getElementById('aeCss')) return;
-    var css = document.createElement('style'); css.id = 'aeCss';
-    css.textContent =
-      '.ae-panel { display: grid; gap: 10px; padding: 12px; border-radius: 16px; background: rgba(21,17,31,.9); border: 2px solid rgba(255,246,224,.22); color: var(--paper, #fff6e0); font-family: var(--ui, "Fredoka", sans-serif); }' +
-      '.ae-title { font-family: var(--display, "Bangers", Impact, sans-serif); font-size: 30px; letter-spacing: .05em; text-align: center; color: #ff8629; -webkit-text-stroke: 1.5px #15111f; paint-order: stroke fill; line-height: 1; }' +
-      '.ae-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; }' +
-      '.ae-row img { width: 56px; height: 56px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }' +
-      '.ae-name { font-family: var(--display, "Bangers", Impact, sans-serif); font-size: 21px; letter-spacing: .05em; line-height: 1; }' +
-      '.ae-step { font-size: 11px; font-weight: 700; letter-spacing: .03em; white-space: nowrap; opacity: .85; margin-top: 2px; }' +
-      '.ae-row.max .ae-step { color: #ffd21f; opacity: 1; }' +
-      '.ae-pips { display: flex; gap: 4px; margin-top: 5px; }' +
-      '.ae-pips i { width: 17px; height: 8px; border-radius: 3px; background: rgba(255,246,224,.14); border: 1.5px solid #15111f; }' +
-      '.portrait .ae-panel { position: absolute; left: 0; right: 0; top: calc(100% + 12px); z-index: 5; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 8px; gap: 8px; }' +
-      '.portrait .ae-title { display: none; }' +
-      '.portrait .ae-row { grid-template-columns: 34px minmax(0, 1fr); gap: 5px; }' +
-      '.portrait .ae-row img { width: 34px; height: 34px; }' +
-      '.portrait .ae-name { font-size: 13px; } .portrait .ae-step { font-size: 8px; white-space: normal; }' +
-      '.portrait .ae-pips i { width: 9px; height: 6px; }' +
-      '.ae-fx { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 40; }' +
-      '.ae-card { display: grid; justify-items: center; gap: 4px; animation: aeCard 1.3s ease-out both; }' +
-      '.ae-card img { width: 46%; max-width: 360px; filter: drop-shadow(0 10px 30px rgba(0,0,0,.75)); }' +
-      '.ae-card b { font-family: var(--display, "Bangers", Impact, sans-serif); font-weight: 400; font-size: 60px; letter-spacing: .05em; color: #fff; -webkit-text-stroke: 3px #15111f; paint-order: stroke fill; text-shadow: 4px 4px 0 #15111f; white-space: nowrap; }' +
-      '.ae-card.max b { color: #ffd21f; }' +
-      '.portrait .ae-card b { font-size: 30px; -webkit-text-stroke: 2px #15111f; }' +
-      '@keyframes aeCard { 0% { transform: scale(.3); opacity: 0; } 18% { transform: scale(1.12); opacity: 1; } 30% { transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04); } }';
-    document.head.appendChild(css);
-  }
-  function aeBuild() {
-    aeCss();
-    if (aeEl) return aeEl;
-    aeEl = document.createElement('section'); aeEl.className = 'ae-panel'; aeEl.id = 'aePanel'; aeEl.hidden = true;
-    aeEl.setAttribute('aria-live', 'polite');
-    aeEl.innerHTML = '<div class="ae-title">ALTER EGO</div>' + AE_SYM.map(function (s, i) {
-      return '<div class="ae-row" data-i="' + i + '"><img alt=""><div><div class="ae-name">' + AE_NAMN[i] + '</div><div class="ae-step"></div>' +
-        '<div class="ae-pips"><i></i><i></i><i></i><i></i><i></i></div></div></div>';
-    }).join('');
-    return aeEl;
-  }
-  function aePlace() {
-    var el2 = aeBuild(), portrait = document.documentElement.classList.contains('portrait');
-    var home = document.getElementById(portrait ? 'machine' : 'right');
-    if (home && el2.parentNode !== home) { if (portrait) home.appendChild(el2); else home.insertBefore(el2, home.firstChild); }
-  }
-  // per gubbe: hur många som är låsta och det högsta steget (från rutorna, eller de låsta medan hjulen snurrar)
-  function aeStats() {
-    var st = AE_SYM.map(function () { return { n: 0, max: 1 }; });
-    for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) {
-      var k, sym;
-      if (aeLockView) { k = aeLockView.L[r] && aeLockView.L[r][y]; sym = aeLockView.G[r][y]; }
-      else { var c = reels[r] && reels[r].cells[y]; if (!c) continue; k = c.ae; sym = c.sym; }
-      var i = AE_SYM.indexOf(sym);
-      if (i < 0 || !(k >= 2)) continue;
-      st[i].n++; if (k > st[i].max) st[i].max = k;
-    }
-    return st;
-  }
-  function aePanel() {
-    if (!aeEl || aeEl.hidden) return;
-    aePlace();
-    var stats = aeStats(), rows = aeEl.querySelectorAll('.ae-row');
-    for (var i = 0; i < 3; i++) {
-      var s = stats[i], k = s.max, row = rows[i], img = row.querySelector('img'), src = AE_SRC[AE_SYM[i]][k - 1];
-      if (img.getAttribute('src') !== src) img.setAttribute('src', src);
-      row.querySelector('.ae-step').textContent = !s.n ? 'INGEN LÅST' : s.n + ' LÅST' + (s.n > 1 ? 'A' : '') + ' · ' + (k >= 5 ? 'ALTER EGO' : 'STEG ' + k);
-      row.querySelectorAll('.ae-pips i').forEach(function (p, j) { p.style.background = j < k ? (k >= 5 ? AE_PIP_MAX : AE_PIP) : ''; });
-      row.classList.toggle('max', k >= 5);
-    }
-  }
-  function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeLockView = null; aeZ = null; aePeekG = null; aePanel(); }
+  // ingen egen panel: allt utanför brädet är C&T:s UI (Pontus 2026-11-11)
+  function aeInit() { aeLockView = null; aeZ = null; aePeekG = null; }
   function aeEnd() {
-    if (aeEl) aeEl.hidden = true;
     aeLockView = null; aeZ = null; aePeekG = null;
     // brädet efter bonusen har inga låsta gubbar
     reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; c.aeDoor = null; }); });
-    document.querySelectorAll('.ae-fx').forEach(function (f) { f.remove(); });
   }
 
   // ---- TEST-menyn, bonusens startkort och reglerna
   function aeNew() {
-    return [['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna i hörnen levlar (3 vinster = nästa LAYER); vinster lånar ur lagren bakåt och ur nästa frispinn (FRAMÅT).']];
+    return [['aeGo', 'THE OTHER SIDE: gratis superbonus', 'Gubbarna i hörnen levlar (3 vinster = nästa LAYER); vinster lånar ur lagren bakåt och ur nästa frispinn (FRAMÅT).']];
   }
   // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
   // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och de låsta gubbarna står kvar mellan
@@ -326,16 +243,16 @@
   function aeFacts() {
     return '<p><b>Fyra gubbar i hörnen.</b> ' + M.AEC_HITS + ' vinster = nästa LAYER. Gubbens LAYER är multi och hur många lager bakåt vinsten når.</p>' +
       '<p><b>Lån:</b> saknas en symbol får vinsten låna den ur lagren bakom brädet eller ur nästa frispinn (<b>FRAMÅT</b>). <b>INFINITY-tal</b> på rutorna läggs till multin.</p>' +
-      '<p>När alla fyra är på LAYER 4 <b>släpper spärren: ALTER EGO</b>. Efter frispinnen <b>rivs väggen</b> (LAYER 1 = x2 … LAYER 5 = x10), sist <b>INFINITY</b> om spärren släppte</p>';
+      '<p>När alla fyra är på LAYER 4 <b>släpper spärren: THE OTHER SIDE</b>. Efter frispinnen <b>rivs väggen</b> (LAYER 1 = x2 … LAYER 5 = x10), sist <b>INFINITY</b> om spärren släppte</p>';
   }
   function aeRule() {
     return '<li>' + txl('Grundspelet: 7 hjul och 7 rader, vinster från vänster och laviner. Grundspelet har inga lager.') + '</li>' +
-      '<li>' + txl('ALTER EGO, frispinnen: fyra gubbar (Killen, Katten, Växten och A) sitter fast i var sitt hörn hela bonusen och börjar på LAYER 1. Vinsterna betalar åt båda hållen, från vänster och från höger. En gubbe som har varit med i {n} vinster går upp ett LAYER, upp till LAYER 4.', { n: M.AEC_HITS }) + '</li>' +
+      '<li>' + txl('THE OTHER SIDE, frispinnen: fyra gubbar (Killen, Katten, Växten och A) sitter fast i var sitt hörn hela bonusen och börjar på LAYER 1. Vinsterna betalar åt båda hållen, från vänster och från höger. En gubbe som har varit med i {n} vinster går upp ett LAYER, upp till LAYER 4.', { n: M.AEC_HITS }) + '</li>' +
       '<li>' + txl('Väggen: när bonusen startar ligger 5 lager bakom brädet (LAYER 1–5). När ett frispinn är slut läggs brädet överst som nytt LAYER 1 och det äldsta faller bort.') + '</li>' +
       '<li>' + txl('Lån bakåt: saknas symbolen på ett hjul får vinsten låna den ur lagren bakom brädet, i rutan på samma rad som vinsten kom ifrån, LAYER 1 först. En vinst genom en gubbe når lika många lager som gubbens LAYER, annars LAYER 1. En vinst lånar högst en symbol.') + '</li>' +
       '<li>' + txl('Lån framåt (FRAMÅT): nästa frispinns bräde syns redan. Finns symbolen inte i lagren bakåt får vinsten låna den därifrån. Den rutan är tom när nästa frispinn landar och fylls ovanifrån.') + '</li>' +
       '<li>' + txl('Multi: gubbens LAYER (LAYER 3 = x3, x5 genom mitten när spärren har släppt) plus INFINITY-talen i vinstens rutor, lånade rutor inräknade. LAYER 3 och två x5 = x13. Några rutor har ett tal (x2–x100), och ett tal som har använts försvinner. WILD x2, x3 och x5 gångrar vägarna.') + '</li>' +
-      '<li>' + txl('Spärren: mitten är låst. När alla fyra gubbarna står på LAYER 4 släpper spärren: ALTER EGO. Gubbarna går in i mitten och blir LAYER 5, och vinster som går genom mittens 3×3 rutor får x5 resten av bonusen.') + '</li>' +
+      '<li>' + txl('Spärren: mitten är låst. När alla fyra gubbarna står på LAYER 4 släpper spärren: THE OTHER SIDE. Gubbarna går in i mitten och blir LAYER 5, och vinster som går genom mittens 3×3 rutor får x5 resten av bonusen.') + '</li>' +
       '<li>' + txl('Finalen efter sista frispinnet: väggen rivs. Släppte spärren får du LAYER 1–5, annars så många lager som den högsta gubben nådde. Varje lager spelas som ett eget bräde med dubbla sitt nummer i multi (LAYER 1 = x2, LAYER 3 = x6, LAYER 5 = x10), med gubbarna på sina rutor och en WILD i mitten när spärren har släppt.') + '</li>' +
       '<li>' + txl('INFINITY: släppte spärren kommer ett sista bräde efter LAYER 5. Ungefär var åttonde ruta har ett tal (x2, x3, x5, x10, x25, x50, x100, x500 eller x1000). En vinst gångras med summan av talen i sina rutor, och ett tal som har använts försvinner.') + '</li>';
   }
@@ -351,10 +268,9 @@
   // ODD INFINITY: skiffer, kräm och turkos (skylten), bilderna ur C&T:s ODD INFINITY (Pontus 2026-11-11: "ODD infinty är
   // det som ska användas för infinitylayert")
   var AEC_SKIFFER = '#1d2629', AEC_KRAM = '#f6e7c8', AEC_TURKOS = '#3fbfa0';
-  var AEC_ODD = { last: 'assets/odd-inf/odd-inf-last.webp', oppen: 'assets/odd-inf/odd-inf-oppen.webp' };
   // aecView: { lev: gubbarnas LAYER, open: spärren har släppt, final: lagret som rivs i finalen (6 = INFINITY), depth,
-  // inf: talen på rutorna, next: FRAMÅT-brädet { g, v }, started }; aecSpin: hjulen snurrar (gubbarna ritas fast ovanpå)
-  var aecView = null, aecEl = null, aecSpin = false;
+  // inf: talen på rutorna }; aecSpin: hjulen snurrar (gubbarna ritas fast ovanpå)
+  var aecView = null, aecSpin = false;
   function aecPosOf(i) { var q = aecView && aecView.open ? M.AEC_MID[i] : M.AEC_HOME[i]; return { r: q[0], y: q[1] }; }
   function aecSprOf(i, lev) { var sym = M.AEC_SYM[i]; return (AE_IMG[sym] && aeSpr(sym, lev)) || sprites[sym]; }
   // gubbarnas rutor på brädet får sitt LAYER (bild och ram); allt annat nollställs
@@ -388,30 +304,10 @@
   function aecGhostView(res) {
     return state.fs && res && res.aecWall1 ? { grid: res.aecWall1.map(function (c) { return c.slice(); }), t0: clock, out: null } : null;
   }
-  // ovanpå brädet: mitten (frispinnen) och talen på rutorna
+  // ovanpå brädet: talen på rutorna (ingen skylt i mitten, Pontus 2026-11-11: bara C&T:s UI)
   function aecDraw(g) {
     if (!aecView) return;
-    if (!aecView.final) aecMidDraw(g);
     if (aecView.inf && !aecSpin) aecInfDraw(g);
-  }
-  // mitten: låst (en skylt med hur många gubbar som saknar LAYER 4) eller öppen (guld, ALTER EGO x5)
-  function aecMidDraw(g) {
-    var x0 = cell * 2, y0 = cell * 2, w = cell * 3, open = aecView.open;
-    var left = aecView.lev.filter(function (l) { return l < M.AEC_LOCK; }).length;
-    var fl = 0;
-    g.save();
-    g.globalAlpha = open ? 0.14 + 0.3 * fl : 0.06; g.fillStyle = open ? AEC_FARG[5] : PAPER;
-    rr(g, x0 + 3, y0 + 3, w - 6, w - 6, cell * 0.2); g.fill();
-    g.globalAlpha = open ? 0.95 : 0.45; g.strokeStyle = open ? AEC_FARG[5] : PAPER; g.lineWidth = Math.max(2, cell * (open ? 0.06 : 0.035));
-    if (!open) g.setLineDash([cell * 0.12, cell * 0.09]);
-    rr(g, x0 + 3, y0 + 3, w - 6, w - 6, cell * 0.2); g.stroke(); g.setLineDash([]);
-    var txt = open ? 'ALTER EGO  x5' : 'LÅST · ' + left + ' KVAR TILL LAYER ' + M.AEC_LOCK;
-    var lh = cell * 0.28, lw = Math.min(w - cell * 0.2, lh * 0.5 * txt.length + lh), lx = x0 + (w - lw) / 2, ly = y0 + w - lh - cell * 0.08;
-    g.globalAlpha = 1; g.fillStyle = open ? AEC_FARG[5] : INK; g.strokeStyle = open ? INK : PAPER; g.lineWidth = Math.max(1.5, cell * 0.025);
-    rr(g, lx, ly, lw, lh, lh * 0.45); g.fill(); g.stroke();
-    g.fillStyle = open ? INK : PAPER; g.font = Math.round(lh * 0.62) + 'px ' + DISPLAY; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(txt, lx + lw / 2, ly + lh * 0.56);
-    g.restore();
   }
   // INFINITY-talen på rutorna: brickor i ODD INFINITY:s färger nere i hörnet
   function aecInfDraw(g) {
@@ -433,18 +329,15 @@
     g.fillText('x' + v, bx + bw / 2, by + bh * 0.56);
     g.restore();
   }
-  // ett frispinn börjar: gubbarnas läge och FRAMÅT-brädet, eller finalens lager. Inga kort (Pontus 2026-11-11: "ta bort
+  // ett frispinn börjar: gubbarnas läge, eller finalens lager. Inga kort (Pontus 2026-11-11: "ta bort
   // alla animationer"). Talen syns först när brädet har landat.
   async function aecSpinStart(res) {
-    aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
     if (!aecView) aecView = { lev: res.aeC0.slice(), open: !!res.aeOpen0 };
     aecView.lev = res.aeC0.slice(); aecView.open = !!res.aeOpen0;
     aecView.inf = null;
     aecSpin = true;
-    if (res.aeFinal) { aecView.final = res.aeFinal; aecView.depth = res.aeDepth; aecView.next = null; aecPanel(); return; }
-    aecView.final = 0; aecView.started = true;
-    aecView.next = res.aecNext0 ? { g: res.aecNext0.g.map(function (c) { return c.slice(); }), v: res.aecNext0.v.map(function (c) { return c.slice(); }) } : null;
-    aecPanel();
+    if (res.aeFinal) { aecView.final = res.aeFinal; aecView.depth = res.aeDepth; return; }
+    aecView.final = 0;
   }
   function aecLanded(res) {
     aecSpin = false; aecIconsSet(null);
@@ -453,8 +346,7 @@
   }
   // vinsten: lånen syns med C&T:s rivna hörn (spelets egen tidsvägsvisning); här bara ingenting extra
   function aecWinShow(st) { }
-  // efter ett lavinsteg: talen som användes försvinner, rutan som lånades ur FRAMÅT blir tom i panelen, gubbarnas LAYER och
-  // spärren uppdateras (utan kort)
+  // efter ett lavinsteg: talen som användes försvinner, gubbarnas LAYER och spärren uppdateras
   async function aecStep(st) {
     if (!aecView) return;
     if (aecView.final) {
@@ -465,80 +357,15 @@
     var u = st.aecUse;
     if (u) {
       u.inf.forEach(function (c) { if (aecView.inf) aecView.inf[c.r][c.y] = 0; });
-      u.fwd.forEach(function (c) { if (aecView.next) { aecView.next.g[c.r][c.y] = -1; aecView.next.v[c.r][c.y] = 0; } });
     }
     aecView.lev = st.aeC.slice();
     st.aeCup.forEach(function (i) { var p = aecPosOf(i), c = reels[p.r] && reels[p.r].cells[p.y]; if (c) c.aecLev = st.aeC[i]; });
     if (st.aeOpened) aecView.open = true;
-    aecPanel();
-  }
-  // panelen: gubbarnas LAYER, ODD INFINITY-skylten (bakom stängslet tills spärren släpper) och FRAMÅT-brädet (nästa
-  // frispinn, med sina tal)
-  function aecBuild() {
-    aeCss();
-    if (!document.getElementById('aecCss')) {
-      var css = document.createElement('style'); css.id = 'aecCss';
-      css.textContent = '.ae-fin { font-family: var(--display, "Bangers", Impact, sans-serif); font-size: 17px; letter-spacing: .05em; text-align: center; color: #ffd21f; }' +
-        '.aec-odd { width: 100%; display: block; }' +
-        '.aec-fram { display: grid; gap: 4px; justify-items: center; } .aec-fram b { font-family: var(--display, "Bangers", Impact, sans-serif); font-weight: 400; font-size: 15px; letter-spacing: .05em; color: ' + AEC_TURKOS + '; }' +
-        '.aec-fram canvas { width: 154px; height: 154px; border-radius: 8px; border: 2px solid ' + AEC_TURKOS + '; background: ' + AEC_SKIFFER + '; }' +
-        '.portrait #aecPanel { grid-template-columns: repeat(4, minmax(0, 1fr)); } .portrait .ae-fin { grid-column: 1 / -1; font-size: 12px; }' +
-        '.portrait .aec-odd { grid-column: 1 / 3; } .portrait .aec-fram { grid-column: 3 / 5; } .portrait .aec-fram canvas { width: 84px; height: 84px; } .portrait .aec-fram b { font-size: 10px; }';
-      document.head.appendChild(css);
-    }
-    if (aecEl) return aecEl;
-    aecEl = document.createElement('section'); aecEl.className = 'ae-panel'; aecEl.id = 'aecPanel'; aecEl.hidden = true;
-    aecEl.innerHTML = '<div class="ae-title">ALTER EGO</div>' + [0, 1, 2, 3].map(function (i) {
-      return '<div class="ae-row" data-i="' + i + '"><img alt=""><div><div class="ae-name">' + AEC_NAMN[i] + '</div><div class="ae-step"></div>' +
-        '<div class="ae-pips"><i></i><i></i><i></i><i></i><i></i></div></div></div>';
-    }).join('') + '<div class="ae-fin"></div><img class="aec-odd" alt="INFINITY">' +
-      '<div class="aec-fram"><b></b><canvas width="308" height="308"></canvas></div>';
-    return aecEl;
-  }
-  function aecPlace() {
-    var el3 = aecBuild(), portrait = document.documentElement.classList.contains('portrait');
-    var home = document.getElementById(portrait ? 'machine' : 'right');
-    if (home && el3.parentNode !== home) { if (portrait) home.appendChild(el3); else home.insertBefore(el3, home.firstChild); }
-  }
-  function aecPanel() {
-    if (!aecEl || aecEl.hidden || !aecView) return;
-    aecPlace();
-    var rows = aecEl.querySelectorAll('.ae-row'), left = aecView.lev.filter(function (l) { return l < M.AEC_LOCK; }).length;
-    for (var i = 0; i < 4; i++) {
-      var lv = aecView.lev[i], sym = M.AEC_SYM[i], row = rows[i], img = row.querySelector('img');
-      var src = AE_SRC[sym] ? AE_SRC[sym][lv - 1] : symRawSrc(sym);
-      if (src && img.getAttribute('src') !== src) img.setAttribute('src', src);
-      row.querySelector('.ae-step').textContent = lv >= 5 ? 'ALTER EGO · x5' : 'LAYER ' + lv + ' · x' + lv + (lv >= M.AEC_LOCK ? ' · KLAR' : '');
-      row.querySelectorAll('.ae-pips i').forEach(function (q, j) { q.style.background = j < lv ? AEC_FARG[j + 1] : ''; });
-      row.classList.toggle('max', lv >= M.AEC_LOCK);
-    }
-    var D = aecView.open ? 5 : Math.max.apply(null, aecView.lev);
-    aecEl.querySelector('.ae-fin').textContent = aecView.final === 6 ? 'INFINITY' : aecView.final ? 'LAYER ' + aecView.final + ' AV ' + aecView.depth + ' · x' + 2 * aecView.final :
-      aecView.open ? 'SPÄRREN SLÄPPT · FINALEN: LAYER 1–5 + INFINITY' : 'SPÄRREN: ' + left + ' KVAR · FINALEN: LAYER 1–' + D;
-    var odd = aecEl.querySelector('.aec-odd'), osrc = aecView.open ? AEC_ODD.oppen : AEC_ODD.last;
-    if (odd.getAttribute('src') !== osrc) odd.setAttribute('src', osrc);
-    aecMini();
-  }
-  // FRAMÅT-brädet i panelen: nästa frispinns bräde med sina tal; en ruta som har lånats är tom
-  function aecMini() {
-    if (!aecEl || !aecView) return;
-    var box = aecEl.querySelector('.aec-fram'), cv = box.querySelector('canvas'), g = cv.getContext('2d'), N = aecView.next;
-    box.querySelector('b').textContent = aecView.final ? 'FINALEN' : N || !aecView.started ? 'FRAMÅT · NÄSTA FRISPINN' : 'SISTA FRISPINNET · INGET FRAMÅT';
-    var S = cv.width, cs = S / REELS;
-    g.clearRect(0, 0, S, S);
-    g.fillStyle = AEC_SKIFFER; g.fillRect(0, 0, S, S);
-    if (!N || aecView.final) return;
-    for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) {
-      var s = N.g[r][y], x0 = r * cs, y0 = y * cs;
-      if (s >= 0 && sprites[s]) g.drawImage(sprites[s], x0 + cs * 0.06, y0 + cs * 0.06, cs * 0.88, cs * 0.88);
-      if (s >= 0 && N.v[r][y]) aecBricka(g, x0, y0, cs, N.v[r][y]);
-    }
   }
   function aecInit() {
-    aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
-    aecView = { lev: [1, 1, 1, 1], open: false, next: null }; aecSpin = false; aecPanel();
+    aecView = { lev: [1, 1, 1, 1], open: false }; aecSpin = false;
   }
   function aecEnd() {
-    aecView = null; aecSpin = false; ghostView = null; if (aecEl) aecEl.hidden = true;
+    aecView = null; aecSpin = false; ghostView = null;
     reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.aecLev = 0; }); });
   }

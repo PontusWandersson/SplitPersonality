@@ -44,6 +44,47 @@ h = h.replace(/data:image\/(webp|png|jpeg|jpg|gif);base64,[A-Za-z0-9+\/=]{200,}/
   if (pre && KEEP[+pre[1]]) return m;
   count.bort++; return BLANK;
 });
+// bakgrunden: Pontus bild (tivolit på natten, 2026-11-11: "Lägg till den") på C&T:s bakgrundsplats __D[43], som C&T
+// ritar på duken #bg som "cover" (drawBridge: beskärs på sidorna eller upptill och nedtill, tonas i bonusarna)
+rep('__D[43]="' + BLANK + '"', '__D[43]="assets/bakgrund/bakgrund.webp"', 'bakgrundsbilden');
+// Bakgrunden skalar med spelet (Pontus 2026-11-11: "Bakgrunden behöver skala med spelet såklart och VIKTIGA ÄR
+// TELEFONEN"). Datorn: bilden täcker spelets fasta ruta (1408x1018 gånger UIZ, centrerad), så att den alltid ligger lika
+// mot brädet och knapparna; är fönstret bredare eller högre syns samma bild mörkare runt om. Telefonen: spelet är hela
+// fönstret; finns assets/bakgrund/bakgrund-mobil.webp (stående) används den, annars den liggande.
+rep('  function drawBridge(g, w, h) {\n' +
+  '    if (!broImg) return false;\n' +
+  "    g.fillStyle = '#0d1522'; g.fillRect(0, 0, w, h);\n" +
+  '    if (!broImg.complete || !broImg.naturalWidth) return true;\n' +
+  '    var iw = broImg.naturalWidth, ih = broImg.naturalHeight, s = Math.max(w / iw, h / ih), dw = iw * s, dh = ih * s;\n' +
+  "    g.imageSmoothingQuality = 'high';\n" +
+  '    g.drawImage(broImg, (w - dw) / 2, (h - dh) / 2, dw, dh);\n',
+  (fs.existsSync(path.join(__dirname, '..', 'assets', 'bakgrund', 'bakgrund-mobil.webp')) ?
+    "  var broImgM = new Image();\n" +
+    "  broImgM.onload = function () { if (typeof drawBackdrop === 'function') drawBackdrop(); };\n" +
+    "  broImgM.onerror = function () { broImgM = null; };\n" +
+    "  broImgM.src = 'assets/bakgrund/bakgrund-mobil.webp';\n" :
+    "  var broImgM = null;   // ingen stående bild än (assets/bakgrund/bakgrund-mobil.webp)\n") +
+  '  function drawBridge(g, w, h) {\n' +
+  '    if (!broImg) return false;\n' +
+  "    g.fillStyle = '#0d1522'; g.fillRect(0, 0, w, h);\n" +
+  "    var phone = document.documentElement.classList.contains('portrait');\n" +
+  '    var im = phone && broImgM && broImgM.complete && broImgM.naturalWidth ? broImgM : broImg;\n' +
+  '    if (!im.complete || !im.naturalWidth) return true;\n' +
+  '    var iw = im.naturalWidth, ih = im.naturalHeight, sw = Math.max(w / iw, h / ih);\n' +
+  '    var s = phone ? sw : (UIZ || 1) * Math.max(DESK_W / iw, DESK_H / ih), dw = iw * s, dh = ih * s;\n' +
+  "    g.imageSmoothingQuality = 'high';\n" +
+  '    if (s < sw - 0.001) { g.save(); g.globalAlpha = 0.4; g.drawImage(im, (w - iw * sw) / 2, (h - ih * sw) / 2, iw * sw, ih * sw); g.restore(); }\n' +
+  '    g.drawImage(im, (w - dw) / 2, (h - dh) / 2, dw, dh);\n', 'bakgrunden skalar med spelet');
+// Gridramen: Pontus spegelram med bodarna (2026-11-11, "Lägg spelgridden på här") på C&T:s plats för gridramen (__D[45],
+// graffitiramen i C&T; brädbilden __D[44] är kvar tom, så rutorna ser ut som förut). C&T lägger ramens hål exakt på
+// rutnätet och skalar med spelplanen. Hålet uppmätt i bilden (1672x941, genomskinligt): x 440–1231, y 97–841.
+rep('__D[45]="' + BLANK + '"', '__D[45]="assets/gridram/gridram.webp"', 'gridramens bild');
+rep('  var GR_NYC_HAL = [0.1196, 0.1276, 0.8796, 0.874];', '  var GR_NYC_HAL = [0.2632, 0.1031, 0.7368, 0.8948];   // SPLIT PERSONALITY: spegelramens hål', 'gridramens hål');
+// ramens bodar sticker ut ungefär en halv gridbredd på var sida: duken bakom spelplanen (#frameArt) får lika stor marginal
+rep('    var M = Math.max(48, Math.ceil(sr.width / 480 * 58)),', '    var M = Math.max(48, Math.ceil(sr.width / 480 * 58), Math.ceil(sr.width * 0.6)),', 'gridramens marginal');
+// bodarna ligger bakom C&T:s sidokolumner (frispinn, multi, vinst, köpaffischen), inte ovanpå dem: #machine har z-index 3
+// och på telefonen klipps bodarna vid skärmkanten (annars går sidan att dra i sidled)
+rep('</head>', '<style>#left, #right { position: relative; z-index: 4; } .portrait #game { overflow-x: clip; }</style></head>', 'sidokolumnerna över gridramen');
 
 // 2. symbolerna: ALTER EGO:s bilder och neutrala platshållare
 function svg(body) {
@@ -178,8 +219,8 @@ rep('      var AC = window.AudioContext || window.webkitAudioContext;\n      if 
 rep('var BC_PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24];', 'var BC_PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27, 29];', 'summeringens toner');
 // storvinst-rutans bakgrund och nivåtitlar är konst (bortplockad): dölj de tomma bilderna, så att ingen trasig bildram syns
 rep('</head>', '<style>img.ws-bg[src=""], img.ws-ti[src=""], img.ws-bg:not([src]), img.ws-ti:not([src]) { visibility: hidden; }</style></head>', 'storvinstens tomma bilder');
-rep("var kick = state.fs.maniac ? txl('Infinity klart') : txl('Bonusspel klart');", "var kick = state.fs.maniac ? txl('ALTER EGO klart') : txl('Bonusspel klart');", 'summeringens rubrik');
-rep("'Infinity klart': 'Infinity complete',", "'ALTER EGO klart': 'ALTER EGO complete',", 'summeringens rubrik på engelska');
+rep("var kick = state.fs.maniac ? txl('Infinity klart') : txl('Bonusspel klart');", "var kick = state.fs.maniac ? txl('THE OTHER SIDE klart') : txl('Bonusspel klart');", 'summeringens rubrik');
+rep("'Infinity klart': 'Infinity complete',", "'THE OTHER SIDE klart': 'THE OTHER SIDE complete',", 'summeringens rubrik på engelska');
 // ---- NOLAYER: lagerfunktionen bort (Pontus 2026-11-10: "Ta bort alla med layerfunktionen som den är nu. Vi ska bygga den
 // på ett annat vis."). C&T:s lagerkod ligger kvar men stängs av: i spelmotorn med TIME-värdena nedan, i spelet med
 // patcharna under "lagren syns inte". Multin i bonusarna växte bara med lagren och står nu på x1.
@@ -328,9 +369,9 @@ rep(': nxPick ? nxPickGame(hist) : M.playGame(rng, hist, mode || undefined);', '
 rep('      if (!fs && res.scatters < 3 && (state.winHold != null || state.roundWin + amount >= bet() * WINSHOW_X)) {', '      if (!fs && !aeTestOn && res.scatters < 3 && (state.winHold != null || state.roundWin + amount >= bet() * WINSHOW_X)) {', 'läget utan storvinst (1)');
 rep('    else if (res.scatters < 3 && win >= bet() * WINSHOW_MIN * modePrice(game && game.mode)) await winShow(', '    else if (res.scatters < 3 && !aeTestOn && win >= bet() * WINSHOW_MIN * modePrice(game && game.mode)) await winShow(', 'läget utan storvinst (2)');
 rep('        if (!state.slam && (bombAnt || tAnt) && idx > 0) {', '        if (!state.slam && !aeTestOn && (bombAnt || tAnt) && idx > 0) {', 'läget utan bombväntan');
-rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
+rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'THE OTHER SIDE' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
 rep("var INF_LADDER = '<p><b>3 lagervinster</b> öppnar nästa LAYER. Sist öppnas <b class=\"inf-word\">INFINITY</b></p>';",
-  "var INF_LADDER = '<p><b>3 vinster</b> ger gubben nästa LAYER. <b>Alla fyra på LAYER 4 = ALTER EGO</b></p>';", 'bonusens regel');
+  "var INF_LADDER = '<p><b>3 vinster</b> ger gubben nästa LAYER. <b>Alla fyra på LAYER 4 = THE OTHER SIDE</b></p>';", 'bonusens regel');
 // superbonusens hjul snurrar med sina egna remsor (fler wilds)
 rep('    var strips = fs ? M.STRIPS.fs : md && md.strips ? M.STRIPS[md.strips] : REN_STRIPS;', '    var strips = fs ? (aecView && M.STRIPS.aec ? M.STRIPS.aec : M.STRIPS.fs) : md && md.strips ? M.STRIPS[md.strips] : REN_STRIPS;', 'superbonusens remsor');
 
@@ -369,17 +410,17 @@ cut("      '<section><h3>Layerspins</h3><ul>' +", "      '<section><h3>' + txl('
 cut("      '<li>' + (M.TIME.fsLad ? txl('Stegen: kassetten öppnar", "      fsRule +", '', 'reglernas lager i Bonusspelet');
 cut("      '<li>' + (M.TIME.infVals ? infRuleLadder()", "      mnRule +", '', 'reglernas lager i superbonusen');
 cut("      '<li>' + txl('3 LAYERS: varje snurr spelas med LAYER 1–3", "      '<li>' + txl('Vinsterna räknas i gånger insatsen som vanligt.", '', 'reglernas 3 LAYERS');
-rep("'<section><h3>' + txl('Infinity-bonus') + '</h3><ul>' +", "'<section><h3>ALTER EGO</h3><ul>' +", 'reglernas rubrik');
-rep("txl('RTP köpt Infinity')", "txl('RTP köpt ALTER EGO')", 'reglernas RTP-rad', true);
-rep('Blir en av bomberna guld startar Infinity-bonusen i stället.', 'Blir en av bomberna guld startar ALTER EGO i stället.', 'reglernas guldbomb (1)', true);
-rep('Guldbomben startar Infinity-bonusen med {n} frispinn.', 'Guldbomben startar ALTER EGO med {n} frispinn.', 'reglernas guldbomb (2)', true);
-rep("txl('I Infinity-bonusen är vinsterna vinsttabellen gånger {s}", "txl('I ALTER EGO är vinsterna vinsttabellen gånger {s}", 'reglernas skala', true);
-rep("txl('Köp: Infinity-bonusen för {x} gånger insatsen. Köpt Infinity-bonus ger i snitt {p} tillbaka.'", "txl('Köp: ALTER EGO för {x} gånger insatsen. Köpt ALTER EGO ger i snitt {p} tillbaka.'", 'reglernas köp', true);
-rep("txl('INFINITY HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir Infinity-bonusen.", "txl('ALTER EGO HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir ALTER EGO.", 'reglernas läge', true);
+rep("'<section><h3>' + txl('Infinity-bonus') + '</h3><ul>' +", "'<section><h3>THE OTHER SIDE</h3><ul>' +", 'reglernas rubrik');
+rep("txl('RTP köpt Infinity')", "txl('RTP köpt THE OTHER SIDE')", 'reglernas RTP-rad', true);
+rep('Blir en av bomberna guld startar Infinity-bonusen i stället.', 'Blir en av bomberna guld startar THE OTHER SIDE i stället.', 'reglernas guldbomb (1)', true);
+rep('Guldbomben startar Infinity-bonusen med {n} frispinn.', 'Guldbomben startar THE OTHER SIDE med {n} frispinn.', 'reglernas guldbomb (2)', true);
+rep("txl('I Infinity-bonusen är vinsterna vinsttabellen gånger {s}", "txl('I THE OTHER SIDE är vinsterna vinsttabellen gånger {s}", 'reglernas skala', true);
+rep("txl('Köp: Infinity-bonusen för {x} gånger insatsen. Köpt Infinity-bonus ger i snitt {p} tillbaka.'", "txl('Köp: THE OTHER SIDE för {x} gånger insatsen. Köpt THE OTHER SIDE ger i snitt {p} tillbaka.'", 'reglernas köp', true);
+rep("txl('INFINITY HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir Infinity-bonusen.", "txl('THE OTHER SIDE HUNT: samma hjul som BONUS HUNT, och varje bonus som startar blir THE OTHER SIDE.", 'reglernas läge', true);
 // köpmenyn: superbonusen heter ALTER EGO, och läget 3 LAYERS finns inte
-rep("card('b2', 'mn', 'INFINITY<small>BONUS</small>',", "card('b2', 'mn', 'ALTER EGO<small>BONUS</small>',", 'köpmenyns superbonus');
+rep("card('b2', 'mn', 'INFINITY<small>BONUS</small>',", "card('b2', 'mn', 'THE OTHER SIDE<small>BONUS</small>',", 'köpmenyns superbonus');
 rep("      btn('inf', 'mn', 'INFINITY<br>HUNT', txl('Varje bonus blir INFINITY')) +\n      btn('lay3', 'ly', '3<br>LAYERS', txl('LAYER 1–3 i varje snurr')) + '</div></div>';",
-  "      btn('inf', 'mn', 'ALTER EGO<br>HUNT', txl('Varje bonus blir ALTER EGO')) + '</div></div>';", 'köpmenyns lägen');
+  "      btn('inf', 'mn', 'THE OTHER SIDE<br>HUNT', txl('Varje bonus blir THE OTHER SIDE')) + '</div></div>';", 'köpmenyns lägen');
 // guiden "Så funkar spelet" handlar om Layerspins och kassetten: menyvalet döljs (som "Hur man spelar", INTRO_PAUSAT)
 rep('<button class="mitem" type="button" id="mGuide">', '<button class="mitem" type="button" id="mGuide" hidden>', 'guiden i menyn');
 // laddningsskärmens LAYERSPINS-märke
