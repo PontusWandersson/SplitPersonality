@@ -408,6 +408,32 @@
     out.fwd.forEach(function (c) { AEC.next.g[c.r][c.y] = -1; AEC.next.v[c.r][c.y] = 0; });
     return out;
   }
+  // C&T:s rivna hörn (Pontus 2026-11-11: "när dem är lånad så ska dem ha samma utseende som C&T avriven icon", "ändra färg
+  // när det är framtida eller lånad"): vinstens lånade rutor får C&T:s lagerfält (gcols, depth, gsym, timeAt), så att
+  // spelet river affischen i rutan och visar symbolen i lagrets färg med LAYER-taggen. FRAMÅT har djup AEC_FWD_D (egen
+  // färg i spelet). both: utan C&T:s tidsvägsintro (spolningen bakåt). Sätts efter C&T:s ghostUsed-slinga i playRound och
+  // svarar i stället de lånade rutorna som ghostUsed ({ r, y, sym, depth }), så att hörnen förbrukas i spelet.
+  var AEC_FWD_D = 7;
+  function aecGhost(ev) {
+    var used = [], seen = {};
+    ev.wins.forEach(function (w) {
+      if (!w.lcols || !w.lcols.length) return;
+      var gcols = [], depth = [], gsym = [], at = REELS;
+      for (var r = 0; r < REELS; r++) { gcols.push([]); depth.push(0); gsym.push(-1); }
+      w.lcols.forEach(function (c) {
+        var d = c.k || AEC_FWD_D, key = d + ':' + c.r + ',' + c.y;
+        gcols[c.r] = [c.y]; depth[c.r] = d; gsym[c.r] = c.sym; if (c.r < at) at = c.r;
+        if (!seen[key]) { seen[key] = true; used.push({ r: c.r, y: c.y, sym: c.sym, depth: d }); }
+      });
+      w.gcols = gcols; w.depth = depth; w.gsym = gsym; w.timeAt = at; w.both = true;
+    });
+    return used;
+  }
+  // LAYER 1 när frispinnet landar (C&T:s rivna hörn), utan gubbarnas rutor
+  function aecWallTop() {
+    var F = aecFixed();
+    return AEC.wall[0].g.map(function (col, r) { return col.map(function (s, y) { return F[r][y] ? -1 : s; }); });
+  }
   // frispinnet är slut: slutbrädet (utan gubbarna, med talen som är kvar) blir nytt LAYER 1
   function aecPush(grid, V) {
     var F = aecFixed();

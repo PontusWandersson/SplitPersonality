@@ -217,14 +217,15 @@ rep('    var startGrid = grid;\n    for (;;) {',
   '    if (aecOn) aecPlaceIcons(grid);\n' +
   '    // superbonusen (mattespecen): frispinnet landar från FRAMÅT (rutorna som lånades fylls ovanifrån), finalens lager från\n' +
   '    // lagrets bräde; aecV = INFINITY-talen på rutorna. Sedan dras nästa frispinns bräde (FRAMÅT), om det finns ett.\n' +
-  '    var aecLd = null, aecV = null, aecV0 = null, aecNext0 = null;\n' +
+  '    var aecLd = null, aecV = null, aecV0 = null, aecNext0 = null, aecWall1 = null;\n' +
   '    if (aecOn || opts.aecBoard) {\n' +
   '      aecLd = aecLanding(rng, strips, grid, stops, aecOn ? AEC.next : opts.aecBoard, aecOn ? aecFixed() : aecFixedFrom(opts.place || []), aecOn ? null : opts.place);\n' +
   '      grid = aecLd.grid; stops = aecLd.stops; aecV = aecLd.v; aecV0 = copyGrid(aecV);\n' +
   '      if (opts.aecBoard) opts.aeInf = aecV;\n' +
   '    }\n' +
-  '    if (aecOn) { AEC.upSpin = [false, false, false, false]; AEC.next = opts.aecNext ? aecBoard(rng) : null; aecNext0 = aecCopyB(AEC.next); }\n' +
-  '    var startGrid = aecLd ? aecLd.start : grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
+  '    if (aecOn) { AEC.upSpin = [false, false, false, false]; AEC.next = opts.aecNext ? aecBoard(rng) : null; aecNext0 = aecCopyB(AEC.next); aecWall1 = aecWallTop(); }\n' +
+  '    // (brädet visas fyllt: rutorna som lånades framåt syns inte som tomma, Pontus 2026-11-11: "ta bort alla animationer")\n' +
+  '    var startGrid = grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
 rep('      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }',
   '      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }\n' +
   '      // superbonusens hörn: vinsten får det högsta LAYER-numret bland hörnen den går genom; INFINITY: talen i rutorna\n' +
@@ -252,10 +253,12 @@ rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ typ
   '        if (aecL.opened) { aecSt.aeOpened = true; aecSt.aecPlace = aecPlaceIcons(t.grid); aecSt.aecPlace.forEach(function (p) { aecV[p.r][p.y] = 0; }); }\n' +
   '        // talen och de lånade rutorna som vinsterna använde försvinner (aecUse)\n' +
   '        aecSt.aecUse = aecUse(ev, aecV);\n' +
+  '        // lånen visas med C&T:s rivna hörn (aecGhost: gcols, depth, gsym), och hörnen förbrukas som C&T:s ghostUsed\n' +
+  '        aecSt.ghostUsed = aecGhost(ev);\n' +
   '      }\n' +
   '      if (aeInfUsed) steps[steps.length - 1].aeInfUsed = aeInfUsed;', 'ALTER EGO i lavinen');
 rep('    // guldbomben: med 4 eller fler bomber när hjulen landar', '    // ALTER EGO: frispinnets slutbräde blir nytt LAYER 1 (aecPush)\n    if (aecOn) aecPush(grid, aecV);\n    // guldbomben: med 4 eller fler bomber när hjulen landar', 'frispinnets bräde blir LAYER 1');
-rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, aeOpen0: aeOpen0, aecV0: aecV0, aecNext0: aecNext0, aecLand: aecLd ? aecLd.land : null, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
+rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, aeOpen0: aeOpen0, aecV0: aecV0, aecNext0: aecNext0, aecLand: aecLd ? aecLd.land : null, aecWall1: aecWall1, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
 // grundspelets snurr (också i HUNT-lägena) med omgångens egen vägg i stället för C&T:s vägg från förra omgången (Stake:
 // inget får följa med mellan omgångar)
 rep('    var base = thr ? throwRound(rng, hist, thr) : playRound(rng, baseOpts({ ghost: hist[0] }));', '    var base = thr ? throwRound(rng, hist, thr) : aeBaseRound(rng);', 'grundspelets snurr');
@@ -279,7 +282,7 @@ rep('    MODES: MODES,\n', '    MODES: MODES, aeTestSpin: aeTestSpin, aeBaseRoun
 var AE_JS = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego.js'), 'utf8');
 rep('  async function runFreeSpins(', AE_JS + '  async function runFreeSpins(', 'runFreeSpins');
 rep('    if (!document.body.classList.contains(\'fs\')) fsOn();\n', '    if (!document.body.classList.contains(\'fs\')) fsOn();\n    if (maniac && M.TIME.alterEgo) aecInit();\n', 'hörnen vid bonusstart');
-rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeC0 || res.aeFinal) await aecSpinStart(res);\n      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      if (res.aeC0 || res.aeFinal) aecLanded(res);\n      if (res.aecLand) await aecFill(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
+rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeC0 || res.aeFinal) await aecSpinStart(res);\n      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      if (res.aeC0 || res.aeFinal) aecLanded(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
 // finalen: lagren räknas inte som frispinn och ger inga nya frispinn
 rep('      state.fs.left--; renderMeter(); hud(); clearChips();', '      if (!plan.spins[si].aeFinal) state.fs.left--; renderMeter(); hud(); clearChips();', 'finalens lager räknas inte som frispinn');
 rep('      if (res.scatters >= 3) {', '      if (res.scatters >= 3 && !res.aeFinal) {', 'finalen utan nya frispinn');
@@ -296,13 +299,12 @@ rep('    if (T().minRound && clock - round0 < T().minRound) await wait(T().minRo
 rep('  function drawCell(g, c, x, time, highlight) {\n    var y = c.y * cell;',
   '  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram, och en ruta i lagerzonen visar zonen och LAYER 1 (src/alter-ego.js)\n' +
   '  function drawCell(g, c, x, time, highlight) {\n' +
-  '    if (c.sym < 0) { if (aecView) aecHole(g, c, x); return; }   // superbonusen: rutan lånades framåt (tom tills den fylls)\n' +
+  '    if (c.sym < 0) return;   // en tom ruta ritas inte\n' +
   '    var aeS = aeSwap(c, x), aeZv = aeZoneAt(c, x);\n' +
   '    if (aeS) aeTile(g, c, x, highlight, aeS.k); else if (aeZv) aeZoneBg(g, c, x, highlight, aeZv);\n' +
   '    try { drawCell0(g, c, x, time, highlight); } finally { aeUnswap(aeS); }\n' +
   '    if (aeS) aeMark(g, c, x, highlight, aeS.k);\n' +
   '    if (aeZv) aePeek(g, c, x, highlight, aeZv);\n' +
-  '    if (c.aecDoor) aecDorr(g, c, x);   // superbonusen: en lånad symbol i vinsten\n' +
   '  }\n' +
   '  function drawCell0(g, c, x, time, highlight) {\n    var y = c.y * cell;', 'gubbarna på brädet');
 rep('          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n      } else {',
@@ -344,7 +346,10 @@ function cut(start, end, to, what) {
 }
 // förra snurrets symbol i ett rivet hörn av varje ruta
 rep('    ghostView = any ? { grid: res.ghostIn.map(function (col) { return col.slice(); }), t0: clock, out: null } : null;',
-  '    ghostView = null;   // ALTER EGO: inga lager, inga rivna hörn', 'rivna hörn');
+  '    ghostView = aecGhostView(res);   // ALTER EGO: rivna hörn bara i superbonusens frispinn (LAYER 1), annars inga', 'rivna hörn');
+// FRAMÅT (lån ur nästa frispinn) har djup 7 i C&T:s lagerritning: egen färg (src/alter-ego.js) och » i brickan
+rep("g.strokeStyle = INK; g.strokeText(String(dd), dx2, dy2 + dr * 0.08);", "g.strokeStyle = INK; g.strokeText(dd === 7 ? '»' : String(dd), dx2, dy2 + dr * 0.08);", 'FRAMÅT-brickan (1)');
+rep("g.fillStyle = '#ffffff'; g.fillText(String(dd), dx2, dy2 + dr * 0.08);", "g.fillStyle = '#ffffff'; g.fillText(dd === 7 ? '»' : String(dd), dx2, dy2 + dr * 0.08);", 'FRAMÅT-brickan (2)');
 // LAYERSPINS-loggan och LAYER 1–3 till vänster i grundspelet
 rep('      bl.hidden = false;', '      bl.hidden = true;   // ALTER EGO: ingen LAYERSPINS-panel', 'LAYERSPINS-panelen');
 // bonusarna utan djup i spelet: ingen stege, inga LAYER-brickor i startkortet och inga lagerrader i summeringen
