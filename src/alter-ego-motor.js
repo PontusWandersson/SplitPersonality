@@ -124,3 +124,14 @@
     }
     return { grid: next, stops: nextStops, moves: moves };
   }
+  // TEST-menyn (ALTER EGO-läget): ett frispinn i superbonusen utanför bonusen, med gubbarna och lagren kvar mellan snurren
+  // (AE_TEST) tills läget nollställs (reset). Samma matte som i bonusen: playRound med frispinnens hjul och superbonusens
+  // vinsttabell.
+  var AE_TEST = null;
+  function aeTestSpin(rng, reset) {
+    if (reset || !AE_TEST) AE_TEST = aeStart();
+    if (reset) return null;
+    var keep = AE; AE = AE_TEST;
+    try { return playRound(rng, { fs: true, fsMult: 1, layers: [emptyGrid()], depth: 1, payScale: TIME.maniacScale }); }
+    finally { AE = keep; }
+  }

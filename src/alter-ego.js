@@ -130,7 +130,10 @@
     aePanel();
   }
   // ett nytt frispinn: de låsta gubbarna står kvar medan hjulen snurrar
-  function aeSpinStart(res) { aeLockView = { L: res.aeL0, G: res.startGrid }; aeDjup = res.aeD0 || 0; aePanel(); }
+  function aeSpinStart(res) {
+    aeBuild(); aePlace(); aeEl.hidden = false;
+    aeLockView = { L: res.aeL0, G: res.startGrid }; aeDjup = res.aeD0 || 0; aePanel();
+  }
   function aeLanded(res) { aeCells(res.aeL0, res.aeD0); aeLockView = null; }
   // vinsten går genom dörrarna: gubben visar symbolen ur lagret medan vinsten visas
   function aeDoors(doors) {
@@ -244,7 +247,24 @@
   }
 
   // ---- TEST-menyn, bonusens startkort och reglerna
-  function aeNew() { return [['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och vinster kan gå ner i lagren genom dem.']]; }
+  function aeNew() {
+    return [['aeMode', 'ALTER EGO-läge (på/av)', 'Varje vanligt snurr spelas som i superbonusen: gubbarna och lagren står kvar mellan snurren. Ingen bonusstart. Tryck igen för att stänga av.'],
+      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och vinster kan gå ner i lagren genom dem.']];
+  }
+  // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
+  // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och gubbarna och lagren står kvar mellan
+  // snurren. Ingen bonusstart, inget startkort, ingen summering och ingen storvinst-ruta. Snurret kostar insatsen som
+  // vanligt (låtsassaldot) och betalar superbonusens vinster. Av och på igen nollställer gubbarna och lagren.
+  var aeTestOn = false;
+  function aeTestToggle() {
+    aeTestOn = !aeTestOn;
+    M.aeTestSpin(null, true);
+    if (aeTestOn) aeInit(); else aeEnd();
+  }
+  function aeTestGame(hist) {
+    var r = M.aeTestSpin(rng);
+    return { version: M.ENGINE_VERSION, thr: null, base: r, bonus: null, rawX: r.x, x: Math.min(r.x, M.TIME.maxX), capped: r.x >= M.TIME.maxX, wallOut: hist };
+  }
   function aeFacts() {
     return '<p><b>Vinst = levla och låsas.</b> Killen, Katten och Växten sprängs inte: de blir nästa gubbe och står kvar (en per hjul).</p>' +
       '<p>Saknas symbolen på ett hjul går vinsten <b>ner genom en låst gubbe</b> och hämtar den i lagren. <b>LAYER 2 = +2 i MULTI</b> för vinsten</p>';

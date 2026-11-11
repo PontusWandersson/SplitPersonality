@@ -207,6 +207,18 @@ rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.
 rep('  var TESTS = {\n', '  var TESTS = {\n    // ALTER EGO: en gratis superbonus (src/alter-ego.js, aeNew)\n    aeGo: function () { TESTS.maniac(); },\n', 'testknappen');
 rep('  function nxNew() { return []; }', '  function nxNew() { return aeNew(); }', 'fliken Nytt');
 rep('    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', '    aeEnd();\n    var total = state.fs.total, wasManiac = state.fs.maniac, maxed = state.maxShown;', 'aeEnd');
+// ALTER EGO-läget i TEST (src/alter-ego.js, aeTestOn): vanliga snurr spelas som frispinn i superbonusen, utan läge i
+// köpmenyn och utan storvinst-rutan, och de låsta gubbarna står still när hjulen snurrar
+rep('    aeGo: function () { TESTS.maniac(); },\n', '    aeGo: function () { TESTS.maniac(); },\n    aeMode: function () { aeTestToggle(); },\n', 'testknappen för läget');
+rep("    var mode = typeof forced === 'function' || forceThrow || nxPick ? '' : state.mode || '', cost = spinCost(mode);",
+  "    var mode = typeof forced === 'function' || forceThrow || nxPick || aeTestOn ? '' : state.mode || '', cost = spinCost(mode);", 'läget utan köpmenyns läge');
+rep(': nxPick ? nxPickGame(hist) : M.playGame(rng, hist, mode || undefined);', ': nxPick ? nxPickGame(hist) : aeTestOn ? aeTestGame(hist) : M.playGame(rng, hist, mode || undefined);', 'läget i snurret');
+rep('      await spinReels(res, false);\n      await presentSteps(res, false);', '      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, false);\n      if (res.aeL0) aeLanded(res);\n      await presentSteps(res, false);', 'läget när hjulen snurrar');
+rep('      if (!fs && res.scatters < 3 && (state.winHold != null || state.roundWin + amount >= bet() * WINSHOW_X)) {', '      if (!fs && !res.aeL0 && res.scatters < 3 && (state.winHold != null || state.roundWin + amount >= bet() * WINSHOW_X)) {', 'läget utan storvinst (1)');
+rep('    else if (res.scatters < 3 && win >= bet() * WINSHOW_MIN * modePrice(game && game.mode)) await winShow(', '    else if (res.scatters < 3 && !res.aeL0 && win >= bet() * WINSHOW_MIN * modePrice(game && game.mode)) await winShow(', 'läget utan storvinst (2)');
+rep('    MODES: MODES,\n', '    MODES: MODES, aeTestSpin: aeTestSpin,\n', 'aeTestSpin i CTMath');
+// bomberna på frispinnens hjul startar ingen bonus i läget, så hjulen väntar inte på dem
+rep('        if (!state.slam && (bombAnt || tAnt) && idx > 0) {', '        if (!state.slam && !aeTestOn && (bombAnt || tAnt) && idx > 0) {', 'läget utan bombväntan');
 rep("<h2 class=\"ov-title\">' + (maniac ? 'INFINITY' : txl('BONUSSPEL'))", "<h2 class=\"ov-title\">' + (maniac ? 'ALTER EGO' : txl('BONUSSPEL'))", 'bonusens rubrik', true);
 rep("var INF_LADDER = '<p><b>3 lagervinster</b> öppnar nästa LAYER. Sist öppnas <b class=\"inf-word\">INFINITY</b></p>';",
   "var INF_LADDER = '<p><b>Killen, Katten och Växten</b> levlar var för sig: <b>5 karaktärer i vinster</b> ger nästa steg. <b>Steg 5 = ALTER EGO</b></p>';", 'bonusens regel');

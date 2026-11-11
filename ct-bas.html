@@ -3516,6 +3516,17 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     }
     return { grid: next, stops: nextStops, moves: moves };
   }
+  // TEST-menyn (ALTER EGO-läget): ett frispinn i superbonusen utanför bonusen, med gubbarna och lagren kvar mellan snurren
+  // (AE_TEST) tills läget nollställs (reset). Samma matte som i bonusen: playRound med frispinnens hjul och superbonusens
+  // vinsttabell.
+  var AE_TEST = null;
+  function aeTestSpin(rng, reset) {
+    if (reset || !AE_TEST) AE_TEST = aeStart();
+    if (reset) return null;
+    var keep = AE; AE = AE_TEST;
+    try { return playRound(rng, { fs: true, fsMult: 1, layers: [emptyGrid()], depth: 1, payScale: TIME.maniacScale }); }
+    finally { AE = keep; }
+  }
 
   // LADCAP: det högsta steget stegen kan nå (INFINITY-bonusen: infAt, Bonusspelet: fsDepth)
   function ladNeed(u) { return Array.isArray(LADX) ? LADX[Math.min(u, LADX.length) - 1] : LADX; }
@@ -3853,7 +3864,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     fsAwardTime: function (n) { return TIME.fsAward[Math.min(n, 6)] || 0; },
     // Lagerkast i grundspelet (sällsynt, utan multi): Ted kastar in ett lager (2 snurr bakåt), Carla två (3 snurr bakåt);
     // kastar båda blir det 3. Svarar null när ingen kastar.
-    MODES: MODES,
+    MODES: MODES, aeTestSpin: aeTestSpin,
     layerThrow: layerThrow, throwRound: throwRound, newWall: newWall, baseOpts: baseOpts, playGame: playGame, buyGame: buyGame, buyTrigger: buyTrigger, playBonus: playBonus, payout: payout, ENGINE_VERSION: ENGINE_VERSION,
     // det en bonusrunda behöver utöver fs/fsMult/layers: hur många lager bakåt och bonusens vinsttabell
     bonusOpts: function (maniac) { return maniac ? { depth: TIME.maniacDepth, payScale: TIME.maniacScale } : { depth: TIME.fsDepth, payScale: TIME.fsScale }; }
@@ -10740,7 +10751,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
         // så att ingen bonus kommer utan stängsel (användaren 2026-11-10)
         var here = 0; for (var hy = 0; hy < ROWS; hy++) if (res.startGrid[idx][hy] === SCAT) here++;
         var bombAnt = before === 2 || (before < 3 && before + here >= 3) || goldAnt;
-        if (!state.slam && (bombAnt || tAnt) && idx > 0) {
+        if (!state.slam && !aeTestOn && (bombAnt || tAnt) && idx > 0) {
           p = waitFor(function () { return reels[idx - 1].landed || state.slam; }).then(function () {
             if (state.slam) return;
             reel.anticOn = true; reel.anticTime = tAnt; reel.anticGold = goldAnt;
@@ -13559,7 +13570,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       // storvinst i basspelet: vinsten som gör rundan till en storvinst, och vinsterna efter den, visas utan belopp
       // (bigHit). Beloppet kommer i storvinst-rutan när rundan är klar; vinstfältet står still tills dess.
       var bigLvl = -1;
-      if (!fs && res.scatters < 3 && (state.winHold != null || state.roundWin + amount >= bet() * WINSHOW_X)) {
+      if (!fs && !res.aeL0 && res.scatters < 3 && (state.winHold != null || state.roundWin + amount >= bet() * WINSHOW_X)) {
         if (state.winHold == null) { state.winHold = state.roundWin; var bx = Math.min(res.x, M.TIME.maxX); bigLvl = bx >= 500 ? 3 : bx >= 50 ? 2 : 1; }
         else bigLvl = 0;
       }
@@ -13799,7 +13810,10 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     aePanel();
   }
   // ett nytt frispinn: de låsta gubbarna står kvar medan hjulen snurrar
-  function aeSpinStart(res) { aeLockView = { L: res.aeL0, G: res.startGrid }; aeDjup = res.aeD0 || 0; aePanel(); }
+  function aeSpinStart(res) {
+    aeBuild(); aePlace(); aeEl.hidden = false;
+    aeLockView = { L: res.aeL0, G: res.startGrid }; aeDjup = res.aeD0 || 0; aePanel();
+  }
   function aeLanded(res) { aeCells(res.aeL0, res.aeD0); aeLockView = null; }
   // vinsten går genom dörrarna: gubben visar symbolen ur lagret medan vinsten visas
   function aeDoors(doors) {
@@ -13913,7 +13927,24 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   }
 
   // ---- TEST-menyn, bonusens startkort och reglerna
-  function aeNew() { return [['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och vinster kan gå ner i lagren genom dem.']]; }
+  function aeNew() {
+    return [['aeMode', 'ALTER EGO-läge (på/av)', 'Varje vanligt snurr spelas som i superbonusen: gubbarna och lagren står kvar mellan snurren. Ingen bonusstart. Tryck igen för att stänga av.'],
+      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och vinster kan gå ner i lagren genom dem.']];
+  }
+  // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
+  // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och gubbarna och lagren står kvar mellan
+  // snurren. Ingen bonusstart, inget startkort, ingen summering och ingen storvinst-ruta. Snurret kostar insatsen som
+  // vanligt (låtsassaldot) och betalar superbonusens vinster. Av och på igen nollställer gubbarna och lagren.
+  var aeTestOn = false;
+  function aeTestToggle() {
+    aeTestOn = !aeTestOn;
+    M.aeTestSpin(null, true);
+    if (aeTestOn) aeInit(); else aeEnd();
+  }
+  function aeTestGame(hist) {
+    var r = M.aeTestSpin(rng);
+    return { version: M.ENGINE_VERSION, thr: null, base: r, bonus: null, rawX: r.x, x: Math.min(r.x, M.TIME.maxX), capped: r.x >= M.TIME.maxX, wallOut: hist };
+  }
   function aeFacts() {
     return '<p><b>Vinst = levla och låsas.</b> Killen, Katten och Växten sprängs inte: de blir nästa gubbe och står kvar (en per hjul).</p>' +
       '<p>Saknas symbolen på ett hjul går vinsten <b>ner genom en låst gubbe</b> och hämtar den i lagren. <b>LAYER 2 = +2 i MULTI</b> för vinsten</p>';
@@ -14189,13 +14220,13 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       return;
     }
     // läget i ODD-menyn (state.mode); TEST-snurren spelas utan läge
-    var mode = typeof forced === 'function' || forceThrow || nxPick ? '' : state.mode || '', cost = spinCost(mode);
+    var mode = typeof forced === 'function' || forceThrow || nxPick || aeTestOn ? '' : state.mode || '', cost = spinCost(mode);
     if (state.balance < cost) { await outOfCoins(); return; }
     beginRound(cost);
     var res, game = null, round0 = clock;
     // hela omgången (lagerkast, grundsnurr, bonus och tak) avgörs av spelmotorn; spelet visar bara resultatet
     var hist = engineWall();
-    game = typeof forced === 'function' ? forcedGame(forced(takeGhost()), hist) : forceThrow ? throwGame(forceThrow, hist) : nxPick ? nxPickGame(hist) : M.playGame(rng, hist, mode || undefined);
+    game = typeof forced === 'function' ? forcedGame(forced(takeGhost()), hist) : forceThrow ? throwGame(forceThrow, hist) : nxPick ? nxPickGame(hist) : aeTestOn ? aeTestGame(hist) : M.playGame(rng, hist, mode || undefined);
     forceThrow = null;
     res = game.base;
     if (opts && opts.triggOnly) {
@@ -14212,7 +14243,9 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       if (game && game.thr) await layerThrow(game.thr);
       // 3 LAYERS: lagren 1–3 lyser i varje snurr (utan kassetten)
       else if (game && game.mode === 'lay3') baseLag(3);
+      if (res.aeL0) aeSpinStart(res);
       await spinReels(res, false);
+      if (res.aeL0) aeLanded(res);
       await presentSteps(res, false);
     }
     if (res.scatters >= 3 && !state.maxShown && game.triggOnly && !resume) {
@@ -14235,7 +14268,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     var win = Math.min(state.roundWin, capFor());
     if (state.maxShown) { /* maxvinsten är redan visad */ }
     // från WINSHOW_MIN (10x) kommer storvinst-rutan i mitten
-    else if (res.scatters < 3 && win >= bet() * WINSHOW_MIN * modePrice(game && game.mode)) await winShow(win, win >= capFor(), { pre: state.winHold });
+    else if (res.scatters < 3 && !res.aeL0 && win >= bet() * WINSHOW_MIN * modePrice(game && game.mode)) await winShow(win, win >= capFor(), { pre: state.winHold });
     if (T().minRound && clock - round0 < T().minRound) await wait(T().minRound - (clock - round0));
     endRound(res);
   }
@@ -14824,6 +14857,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   var TESTS = {
     // ALTER EGO: en gratis superbonus (src/alter-ego.js, aeNew)
     aeGo: function () { TESTS.maniac(); },
+    aeMode: function () { aeTestToggle(); },
     // Layerspins: rundans första vinst går via förra snurret minst två gånger
     tswitch: function () { tidsTest(function (r) { return firstTime(r, function (w) { return (w.hops || 0) >= 2; }); }); },
     big: function () { tidsTest(function (r) { return r.x >= 55 && r.scatters < 3; }); },
