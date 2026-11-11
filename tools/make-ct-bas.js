@@ -109,11 +109,12 @@ rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 
 // Bonusspelet var 72:a snurr). Bonusspelet kommer ungefär var 280:e snurr. Utan lager (NOLAYER nedan) och med multi x1 i
 // bonusarna: hela spelet cirka 93–96 % (grundspelet cirka 66 %, bonusarna cirka 30 %), köpt Bonusspel och köpt ALTER EGO
 // cirka 96 %. Bonusarnas vinster är scale × fsScale och scale × maniacScale.
-// ALTER EGO med dörrarna (2026-11-11, scratchpad sim-dorr.js, köpt ALTER EGO genom CTMath.buyGame): 97,8, 95,4 och 92,5 %
-// vid maniacScale 3,55 (7 000 köp var), alltså 3,58 för 96 %. Medianen cirka 187x på köpet för 500x, 39 % under 100x, cirka
-// 11 dörrar och 5 låsta gubbar per bonus, ALTER EGO (steg 5) i 78 % av bonusarna, maxvinsten 2 gånger på 21 000 köp.
-// Snittet är detsamma som förut, så hela spelet och HUNT-lägena påverkas inte.
-var CAL = { scale: 0.4338, fsScale: 3.649, maniacScale: 3.58 };
+// ALTER EGO med spridningen (2026-11-11, scratchpad sim-spr.js, köpt ALTER EGO genom CTMath.buyGame): 93,7, 89,5 och 89,3 %
+// vid maniacScale 1,48 (4 000 köp var), alltså 1,565 för 96 %. Medianen cirka 300x på köpet för 500x, 28 % under 100x, de
+// sämsta 10 % cirka 5x, cirka 22 steg upp och 27 spridningar per bonus, ALTER EGO (steg 5) i 83 % av bonusarna, ingen
+// maxvinst på 12 000 köp. Snittet är detsamma som förut, så hela spelet och HUNT-lägena påverkas inte.
+// (Dörrarna samma dag: 3,58.)
+var CAL = { scale: 0.4338, fsScale: 3.649, maniacScale: 1.565 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
 // HUNT-lägena i köpmenyn (7x7, utan lager; mätt i sidan 2026-11-10 med CTMath.playGame(rng, vägg, läge)): två bomber på
 // hjul 1–6 och ingen på hjul 7, så att Bonusspelet kommer ungefär var 41:a snurr (C&T: var 39:e). BONUS HUNT ger 2,735x per
@@ -134,16 +135,17 @@ rep("'Infinity klart': 'Infinity complete',", "'ALTER EGO klart': 'ALTER EGO com
 // ---- NOLAYER: lagerfunktionen bort (Pontus 2026-11-10: "Ta bort alla med layerfunktionen som den är nu. Vi ska bygga den
 // på ett annat vis."). C&T:s lagerkod ligger kvar men stängs av: i spelmotorn med TIME-värdena nedan, i spelet med
 // patcharna under "lagren syns inte". Multin i bonusarna växte bara med lagren och står nu på x1.
-// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Gubben är en dörr ner i lagren (Pontus 2026-11-11: "Bygg
-// så jag får se vad du menar"): Killen (2), Katten (3) och Växten (4) i en vinst levlar och låses, lavinerna bygger lagren
-// och en vinst kan gå ner i lagren genom en låst gubbe. Spelmotorns del ligger i src/alter-ego-motor.js, spelets i
-// src/alter-ego.js. (Förut: först stegen 1–5 per karaktär som styrde LAYER 1–5, sedan lager som revs av; båda borttagna.)
+// ---- ALTER EGO (superbonusen), byggd på C&T:s INFINITY-bonus. Gubbarna levlar, låses och sprider sig (Pontus
+// 2026-11-11: "Ersätt dörrarna"): Killen (2), Katten (3) och Växten (4) i en vinst levlar (får ett lager) och låses, och
+// sprider sig efter lavinen till grannrutorna så att det blir kluster. Spelmotorns del ligger i src/alter-ego-motor.js,
+// spelets i src/alter-ego.js. (Förut: stegen 1–5 per karaktär som styrde LAYER 1–5, lager som revs av och dörrar ner i
+// lagren bakom brädet; alla borttagna.)
 var AE_MOTOR = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego-motor.js'), 'utf8');
 rep('var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;',
   'var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;\n' +
   '  // ALTER EGO: C&T:s lager är avstängda (tools/make-ct-bas.js, NOLAYER). Vinsterna når aldrig förra snurret, C&T:s lager\n' +
   '  // eller INFINITY (minCur 99), inga lagerkast, ingen kassett vid bonusstart, ingen INFINITY och ingen stege. Multin\n' +
-  '  // börjar på x1; i superbonusen växer den med ALTER EGO-lagren (src/alter-ego-motor.js).\n' +
+  '  // står på x1 (ALTER EGO-gubbarna i src/alter-ego-motor.js ger ingen multi).\n' +
   '  TIME.minCur = 99; TIME.layerTedP = 0; TIME.layerCarlaP = 0; TIME.infVals = null; TIME.fsLad = false;\n' +
   '  TIME.fsPrefill = false; TIME.maniacPrefill = false; TIME.fsLayersDraw = null; TIME.maniacLayersDraw = null;\n' +
   '  TIME.fsStartDraw = null; TIME.maniacStartDraw = null; TIME.fsStart = 1; TIME.maniacStart = 1;\n' +
@@ -151,43 +153,42 @@ rep('var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;',
   '  // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)\n' +
   '  TIME.scale = ' + CAL.scale + '; TIME.fsScale = ' + CAL.fsScale + '; TIME.maniacScale = ' + CAL.maniacScale + ';\n' +
   AE_MOTOR, 'ALTER EGO i spelmotorn');
-// superbonusens runda (aeOn): de låsta gubbarna landar på sin plats, vinsterna räknas med dörrarna, gubbarna levlar i
-// stället för att sprängas och lavinen faller förbi de låsta
+// superbonusens runda (aeOn): de låsta gubbarna landar på sin plats, gubbarna levlar i stället för att sprängas, lavinen
+// faller förbi de låsta och de som levlade sprider sig
 rep('    var startGrid = grid;\n    for (;;) {',
-  '    // ALTER EGO: de låsta gubbarna står kvar (aeL0 = gubbarnas steg när brädet landar, aeD0 = antalet lager)\n' +
-  '    var aeOn = !!(AE && opts.fs && layers), aeL0 = null, aeD0 = 0;\n' +
-  '    if (aeOn) { aeOverlay(grid); aeL0 = copyGrid(AE.L); aeD0 = AE.stack.length; }\n' +
+  '    // ALTER EGO: de låsta gubbarna står kvar (aeL0 = gubbarnas steg när brädet landar)\n' +
+  '    var aeOn = !!(AE && opts.fs && layers), aeL0 = null;\n' +
+  '    if (aeOn) { aeOverlay(grid); aeL0 = copyGrid(AE.L); }\n' +
   '    var startGrid = grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
 rep('      var ev = layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);',
   '      var ev = aeOn ? aeEvaluate(grid) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
 rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });",
-  '      // ALTER EGO: removed är vinstens rutor (de lyser, också dörrarna), gone det som sprängs, up gubbarna som levlar,\n' +
-  '      // doors vinsterna genom dörrarna, aeN gubbarnas steg efter lavinen, aeDepth antalet lager\n' +
+  '      // ALTER EGO: removed är vinstens rutor (de lyser), gone det som sprängs, up gubbarna som levlar, spread grannarna\n' +
+  '      // som gubbarna sprider sig till efter lavinen (brädet t.grid ändras), aeN gubbarnas steg efter lavinen\n' +
   '      var aeS = aeOn ? aeStep(grid, ev.wins, removed) : null;\n' +
   '      var t = aeS ? aeTumble(strips, grid, stops, aeS.gone) : tumble(strips, grid, stops, removed);\n' +
   "      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });\n" +
   '      if (aeS) {\n' +
   '        var aeSt = steps[steps.length - 1];\n' +
-  '        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.doors = aeS.doors; aeSt.aeN = copyGrid(AE.L); aeSt.aeDepth = AE.stack.length;\n' +
+  '        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.spread = aeSpread(rng, t.grid, aeS.up); aeSt.aeN = copyGrid(AE.L);\n' +
   '      }', 'ALTER EGO i lavinen');
-rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aeD0: aeD0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
+rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
 rep('LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;',
   'LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;\n' +
   '    AE = maniac && TIME.alterEgo ? aeStart() : null;', 'ALTER EGO vid bonusstart');
 rep('var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;',
   'var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;\n' +
   '    AE = null;', 'ALTER EGO vid bonusslut');
-// spelet: gubbarna, dörrarna och panelen (src/alter-ego.js), inkopplat i bonusflödet
+// spelet: gubbarna, spridningen och panelen (src/alter-ego.js), inkopplat i bonusflödet
 var AE_JS = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego.js'), 'utf8');
 rep('  async function runFreeSpins(', AE_JS + '  async function runFreeSpins(', 'runFreeSpins');
 rep('    if (!document.body.classList.contains(\'fs\')) fsOn();\n', '    if (!document.body.classList.contains(\'fs\')) fsOn();\n    if (maniac && M.TIME.alterEgo) aeInit();\n', 'aeInit');
 rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
-// dörrarna syns när vinsten visas (symbolen ur lagret och LAYER-siffran på gubben)
-rep("      markCells(st.removed);\n      state.phase = 'show'; hud();", "      markCells(st.removed);\n      if (st.doors) aeDoors(st.doors);\n      state.phase = 'show'; hud();", 'dörrarna i vinsten');
 // gubbarna på brädet: rutan ritas med sitt stegs bild och ram (aeSwap, aeTile, aeMark), låsta gubbar står still när hjulen
-// snurrar (aeDrawLocked), gubbarna i en vinst levlar i stället för att sprängas (aeLevel) och lavinen faller förbi dem (aeCells)
+// snurrar (aeDrawLocked), gubbarna i en vinst levlar i stället för att sprängas (aeLevel), lavinen faller förbi dem (aeCells)
+// och när lavinen har landat sprider gubbarna som levlade sig till grannarna (aeSpreadShow)
 rep('  function drawCell(g, c, x, time, highlight) {\n    var y = c.y * cell;',
-  '  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram, och en dörr visar symbolen ur lagret (src/alter-ego.js)\n' +
+  '  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram (src/alter-ego.js)\n' +
   '  function drawCell(g, c, x, time, highlight) {\n' +
   '    var aeS = aeSwap(c, x);\n' +
   '    if (aeS) aeTile(g, c, x, highlight, aeS.k);\n' +
@@ -202,7 +203,9 @@ rep('        for (var i = 0; i < reel.cells.length; i++) drawCell(g, reel.cells[
   '        for (var i = 0; i < reel.cells.length; i++) if (!(reel.cells[i].ae >= 2)) drawCell(g, reel.cells[i], x, time, highlight);\n' +
   '        for (var i2 = 0; i2 < reel.cells.length; i2++) if (reel.cells[i2].ae >= 2) drawCell(g, reel.cells[i2], x, time, highlight);', 'låsta gubbar överst');
 rep('      popCells(st.removed);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', '      popCells(st.gone || st.removed);\n      if (st.up) await aeLevel(st);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', 'gubbarna levlar');
-rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.aeN) aeCells(st.aeN, st.aeDepth);\n', 'gubbarna i lavinen');
+rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.aeN) aeCells(st.aeN);\n', 'gubbarna i lavinen');
+rep('      await waitFor(function () { return reels.every(function (x) { return x.settled(); }); });\n      if (fs) {',
+  '      await waitFor(function () { return reels.every(function (x) { return x.settled(); }); });\n      if (st.spread && st.spread.length) await aeSpreadShow(st);\n      if (fs) {', 'spridningen');
 // TEST-menyn, fliken Nytt: en gratis superbonus
 rep('  var TESTS = {\n', '  var TESTS = {\n    // ALTER EGO: en gratis superbonus (src/alter-ego.js, aeNew)\n    aeGo: function () { TESTS.maniac(); },\n', 'testknappen');
 rep('  function nxNew() { return []; }', '  function nxNew() { return aeNew(); }', 'fliken Nytt');

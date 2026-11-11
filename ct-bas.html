@@ -3383,99 +3383,67 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   var INFB = null, INFV = null, LADU = 99, LADC = 0, LADX = 0, LADCAP = 6;
   // ALTER EGO: C&T:s lager är avstängda (tools/make-ct-bas.js, NOLAYER). Vinsterna når aldrig förra snurret, C&T:s lager
   // eller INFINITY (minCur 99), inga lagerkast, ingen kassett vid bonusstart, ingen INFINITY och ingen stege. Multin
-  // börjar på x1; i superbonusen växer den med ALTER EGO-lagren (src/alter-ego-motor.js).
+  // står på x1 (ALTER EGO-gubbarna i src/alter-ego-motor.js ger ingen multi).
   TIME.minCur = 99; TIME.layerTedP = 0; TIME.layerCarlaP = 0; TIME.infVals = null; TIME.fsLad = false;
   TIME.fsPrefill = false; TIME.maniacPrefill = false; TIME.fsLayersDraw = null; TIME.maniacLayersDraw = null;
   TIME.fsStartDraw = null; TIME.maniacStartDraw = null; TIME.fsStart = 1; TIME.maniacStart = 1;
   TIME.alterEgo = true;
   // 7x7 (prototyp, inte certifierat): vinsterna skalade så att spelet och köpen hamnar nära 96 % (tools/make-ct-bas.js, CAL)
-  TIME.scale = 0.4338; TIME.fsScale = 3.649; TIME.maniacScale = 3.58;
+  TIME.scale = 0.4338; TIME.fsScale = 3.649; TIME.maniacScale = 1.565;
   // ================================================================ ALTER EGO i spelmotorn (superbonusen)
-  // Förs in i C&T:s spelmotor av tools/make-ct-bas.js (efter INFB-raden), så scanReel, threadCell, payLen och TIME finns.
-  // Gubben är en dörr ner i lagren (prototyp, Pontus 2026-11-11: "Bygg så jag får se vad du menar"):
+  // Förs in i C&T:s spelmotor av tools/make-ct-bas.js (efter INFB-raden), så scanReel, payLen och TIME finns.
+  // Gubbarna levlar, låses och sprider sig (prototyp, Pontus 2026-11-11: "Ersätt dörrarna" med spridningen: "om man får
+  // ett layer ... sprider ut sina eventuella symboler som kan levlas upp, så man får kluster av samma"):
   // - Killen (2), Katten (3) och Växten (4) i en vinst sprängs inte. Rutan blir nästa gubbe (steg 2–5, ett steg per
   //   lavinsteg) och låses fast resten av bonusen; nästa snurr landar runt den. Det som inte är låst faller förbi.
-  // - Lagren byggs av lavinerna: brädet i varje lavinsteg med vinst läggs bakom som LAYER 1, och de äldre flyttas ett lager
-  //   ner (högst AE_DEPTH). Lagren gäller hela bonusen och backar aldrig till gamla snurr.
-  // - Dörren: saknas symbolen på ett hjul (från hjul AE_MINCUR + 1) kan vinsten gå ner genom en låst gubbe på hjulet och
-  //   hämta symbolen i lagren gubben når: steg 2 når LAYER 1, steg 3 LAYER 1–2, steg 4 LAYER 1–3 och steg 5 (ALTER EGO)
-  //   alla. Det grundaste lagret där symbolen finns används, och rutan i lagret förbrukas. LAYER d ger +d i multi för just
-  //   den vinsten (x1 + summan av lagren). Dörrgubben är med i vinsten och levlar.
   // - Ett hjul har plats för AE_PER_REEL låsta gubbar; en gubbe till i en vinst sprängs som vanligt.
-  // - En vinst räknas bara om minst en ruta inte var låst (eller kommer ur ett lager); annars skulle samma vinst upprepas.
-  // Simulerat 2026-11-11 (köpt ALTER EGO, maniacScale 23,05): låsta resten av bonusen utan gräns per hjul och med multin
-  // kvar resten av bonusen gav cirka 2 300 % och hälften av bonusarna i maxvinsten; bara under snurret gav nästan inga
-  // dörrar. En låst per hjul: 1 700 % med multin kvar, 680 % med multin per snurr och 590 % med multin per vinst (vald:
-  // jämnast, medianen cirka 200x vid 96 %).
-  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_MAX = 5, AE_DEPTH = 4, AE_MINCUR = 2, AE_PER_REEL = 1, AE = null;
-  // AE under superbonusen: L = gubbens steg per ruta (0 = ingen låst gubbe), S = den låsta gubbens symbol, stack = lagren
-  // (stack[0] = LAYER 1)
+  // - Spridningen: varje gång en gubbe levlar (får ett lager) sprider den sig efter lavinen till grannrutorna (de åtta runt
+  //   om): steg 2–4 till 1 granne och steg 5 (ALTER EGO) till 2 (AE_SPRID). Grannen blir samma gubbe på steg 1 (inte låst).
+  //   Låsta gubbar, BONUS och WILD tas aldrig över, och en ruta tas bara över en gång per lavinsteg. Vilka grannar slumpas.
+  // - En vinst räknas bara om minst en ruta inte var låst; annars skulle samma vinst upprepas.
+  // (Förut, samma dag: dörrar ner i lagren bakom brädet, där LAYER d gav +d i multi för vinsten. Ersatta av spridningen.)
+  var AE_CH = { 2: 0, 3: 1, 4: 2 }, AE_MAX = 5, AE_PER_REEL = 1, AE = null;
+  // AE under superbonusen: L = gubbens steg per ruta (0 = ingen låst gubbe), S = den låsta gubbens symbol
   function aeStart() {
     var L = [], S = [];
     for (var r = 0; r < REELS; r++) { L.push(new Array(ROWS).fill(0)); S.push(new Array(ROWS).fill(-1)); }
-    return { L: L, S: S, stack: [] };
+    return { L: L, S: S };
   }
-  // hur många lager en gubbe på steg k når
-  function aeReach(k) { return k >= AE_MAX ? AE_DEPTH : Math.max(0, k - 1); }
-  // de låsta gubbarna står kvar när ett nytt snurr landar (AE_HOLD 'bonus'), eller bara under lavinerna i samma snurr
-  // ('spin': ett nytt snurr börjar utan låsta gubbar; lagren finns kvar)
-  var AE_HOLD = 'bonus';
+  // hur många grannar en gubbe sprider sig till när den når steg k (AE_SPRID[k]): steg 2–4 en granne, ALTER EGO två.
+  // Simulerat 2026-11-11 (köpt ALTER EGO, maniacScale 3,58, 400–1 000 köp per variant): 1/2/3/alla gav 1 330 % och 14 % i
+  // maxvinsten (vid 96 % skulle de sämsta 10 % ge under 1x); 1/1/2/3 590 %; 1/1/1/3 370 %; 1/1/2/2 300 %; 1/1/1/2 230 %
+  // (vald: jämnast, medianen cirka 300x och de sämsta 10 % cirka 8x vid 96 %); 1/1/1/1 170 %.
+  var AE_SPRID = [0, 0, 1, 1, 1, 2];
+  function aeSprid(k) { return AE_SPRID[Math.min(AE_MAX, k)] || 0; }
+  // de låsta gubbarna står kvar när ett nytt snurr landar
   function aeOverlay(grid) {
-    for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) {
-      if (AE_HOLD === 'spin') { AE.L[r][y] = 0; AE.S[r][y] = -1; }
-      else if (AE.L[r][y]) grid[r][y] = AE.S[r][y];
-    }
+    for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) if (AE.L[r][y]) grid[r][y] = AE.S[r][y];
   }
-  // dörren på hjul r: den låsta gubben som når djupast (lika djupt: närmast raden vinsten kom ifrån)
-  function aeDoor(r, from) {
-    var best = null;
-    for (var y = 0; y < ROWS; y++) {
-      var reach = aeReach(AE.L[r][y]);
-      if (!reach) continue;
-      if (!best || reach > best.reach || (reach === best.reach && Math.abs(y - from) < Math.abs(best.y - from))) best = { y: y, reach: reach };
-    }
-    return best;
-  }
-  // ways-vinsterna i superbonusen: som evaluate, och ett hjul utan symbolen kan nås genom en dörr (doors: { r, y: dörrens
-  // rad, d: lagret, ly: raden i lagret, sym }, aeDeep: summan av lagren)
+  // ways-vinsterna i superbonusen: som evaluate, men en vinst räknas bara om minst en ruta inte var låst
   function aeEvaluate(grid) {
     var wins = [], total = 0, PT = TIME.payT || PAY;
     for (var s = 2; s < PAYING; s++) {
-      var ways = 1, len = 0, cols = [], doors = [], deep = 0, from = 0, fresh = false, boost = 1;
+      var ways = 1, len = 0, cols = [], fresh = false, boost = 1;
       for (var r = 0; r < REELS; r++) {
         var hit = { rows: [], weight: 0, top: 1 };
         scanReel(grid, r, s, hit);
-        if (hit.rows.length) {
-          for (var q = 0; q < hit.rows.length; q++) if (!AE.L[r][hit.rows[q]]) fresh = true;
-          cols.push(hit.rows);
-          from = hit.rows.reduce(function (a, b) { return a + b; }, 0) / hit.rows.length;
-        } else {
-          var door = r >= AE_MINCUR && AE.stack.length ? aeDoor(r, from) : null, d = 0;
-          if (door) for (var k = 0; k < Math.min(door.reach, AE.stack.length) && !d; k++) { threadCell(AE.stack[k], r, s, from, hit); if (hit.rows.length) d = k + 1; }
-          if (!d) break;
-          cols.push([]); doors.push({ r: r, y: door.y, d: d, ly: hit.rows[0], sym: AE.stack[d - 1][r][hit.rows[0]] });
-          deep += d; fresh = true; from = door.y;
-        }
+        if (!hit.rows.length) break;
+        for (var q = 0; q < hit.rows.length; q++) if (!AE.L[r][hit.rows[q]]) fresh = true;
+        cols.push(hit.rows);
         ways *= hit.weight; len++; boost *= hit.top;
       }
       if (len >= 3 && fresh && payLen(PT, s, len) > 0) {
-        // dörrarna: LAYER d ger +d i multi för just den här vinsten (x1 + summan av lagren)
-        var pay = payLen(PT, s, len) * PAY_SCALE * TIME.scale * ways * (1 + deep);
-        wins.push({ sym: s, len: len, ways: ways, x: pay, cols: cols, gcols: null, timeAt: -1, boost: boost, tmult: 1, hops: 0, doors: doors, aeDeep: deep, aeX: 1 + deep });
+        var pay = payLen(PT, s, len) * PAY_SCALE * TIME.scale * ways;
+        wins.push({ sym: s, len: len, ways: ways, x: pay, cols: cols, gcols: null, timeAt: -1, boost: boost, tmult: 1, hops: 0 });
         total += pay;
       }
     }
     return { wins: wins, x: total };
   }
-  // ett lavinsteg med vinst: dörrarna lyser med vinsten (removed), gubbarna i vinsterna levlar och låses i stället för att
-  // sprängas, rutorna som hämtades ur lagren förbrukas och brädet läggs bakom som LAYER 1.
-  // Svarar { gone: det som sprängs, up: [{ r, y, k }] gubbar som levlade, doors, deep: summan av lagren (multin) }.
+  // ett lavinsteg med vinst: gubbarna i vinsterna levlar och låses i stället för att sprängas.
+  // Svarar { gone: det som sprängs, up: [{ r, y, k }] gubbar som levlade }.
   function aeStep(grid, wins, removed) {
-    var gone = [], up = [], doors = [], deep = 0, r, y;
-    wins.forEach(function (w) {
-      (w.doors || []).forEach(function (dd) { removed[dd.r][dd.y] = true; doors.push(dd); });
-      deep += w.aeDeep || 0;
-    });
+    var gone = [], up = [], r, y;
     for (r = 0; r < REELS; r++) {
       gone.push(new Array(ROWS).fill(false));
       // AE_PER_REEL: så många låsta gubbar får plats på ett hjul; en gubbe till i en vinst sprängs som vanligt
@@ -3490,10 +3458,26 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
         AE.S[r][y] = grid[r][y];
       }
     }
-    doors.forEach(function (dd) { AE.stack[dd.d - 1][dd.r][dd.ly] = -1; });
-    AE.stack.unshift(copyGrid(grid));
-    if (AE.stack.length > AE_DEPTH) AE.stack.length = AE_DEPTH;
-    return { gone: gone, up: up, doors: doors, deep: deep };
+    return { gone: gone, up: up };
+  }
+  // spridningen efter lavinen (grid = brädet efter lavinen, ändras här): varje gubbe som levlade tar över grannrutor.
+  // Svarar [{ r, y, sym, fr, fy }] (fr, fy: gubben som spred sig).
+  function aeSpread(rng, grid, up) {
+    var out = [], taken = {};
+    up.forEach(function (u) {
+      var sym = AE.S[u.r][u.y], n = aeSprid(u.k), cand = [];
+      for (var dr = -1; dr <= 1; dr++) for (var dy = -1; dy <= 1; dy++) {
+        var r = u.r + dr, y = u.y + dy;
+        if ((!dr && !dy) || r < 0 || r >= REELS || y < 0 || y >= ROWS) continue;
+        var g = grid[r][y];
+        // en ruta tas bara över en gång per lavinsteg
+        if (AE.L[r][y] || taken[r + ',' + y] || g === sym || g === S || isWild(g)) continue;
+        cand.push({ r: r, y: y });
+      }
+      for (var i = cand.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)), t = cand[i]; cand[i] = cand[j]; cand[j] = t; }
+      cand.slice(0, n).forEach(function (c) { grid[c.r][c.y] = sym; taken[c.r + ',' + c.y] = true; out.push({ r: c.r, y: c.y, sym: sym, fr: u.r, fy: u.y }); });
+    });
+    return out;
   }
   // lavinen med låsta gubbar: de låsta står still och det som är kvar faller förbi dem (hjulet utan de låsta rutorna är som
   // ett kortare hjul); nya symboler fyller de översta lediga rutorna. Samma form på svaret som tumble().
@@ -3516,7 +3500,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     }
     return { grid: next, stops: nextStops, moves: moves };
   }
-  // TEST-menyn (ALTER EGO-läget): ett frispinn i superbonusen utanför bonusen, med gubbarna och lagren kvar mellan snurren
+  // TEST-menyn (ALTER EGO-läget): ett frispinn i superbonusen utanför bonusen, med de låsta gubbarna kvar mellan snurren
   // (AE_TEST) tills läget nollställs (reset). Samma matte som i bonusen: playRound med frispinnens hjul och superbonusens
   // vinsttabell.
   var AE_TEST = null;
@@ -3632,9 +3616,9 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     var plain = !opts.fs && TIME.baseMulti === false && (opts.plain || opts.ghost !== undefined);
     // fsTmult: false = i bonusarna finns bara den växande multin, ingen tidsmulti per vinst
     var noTm = plain || (opts.fs && TIME.fsTmult === false);
-    // ALTER EGO: de låsta gubbarna står kvar (aeL0 = gubbarnas steg när brädet landar, aeD0 = antalet lager)
-    var aeOn = !!(AE && opts.fs && layers), aeL0 = null, aeD0 = 0;
-    if (aeOn) { aeOverlay(grid); aeL0 = copyGrid(AE.L); aeD0 = AE.stack.length; }
+    // ALTER EGO: de låsta gubbarna står kvar (aeL0 = gubbarnas steg när brädet landar)
+    var aeOn = !!(AE && opts.fs && layers), aeL0 = null;
+    if (aeOn) { aeOverlay(grid); aeL0 = copyGrid(AE.L); }
     var startGrid = grid;
     for (;;) {
       var ev = aeOn ? aeEvaluate(grid) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);
@@ -3656,14 +3640,14 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
           if (L[gr2][gy2] >= 0) { ghostUsed.push({ r: gr2, y: gy2, sym: L[gr2][gy2], depth: dep }); L[gr2][gy2] = -1; }
         }); });
       });
-      // ALTER EGO: removed är vinstens rutor (de lyser, också dörrarna), gone det som sprängs, up gubbarna som levlar,
-      // doors vinsterna genom dörrarna, aeN gubbarnas steg efter lavinen, aeDepth antalet lager
+      // ALTER EGO: removed är vinstens rutor (de lyser), gone det som sprängs, up gubbarna som levlar, spread grannarna
+      // som gubbarna sprider sig till efter lavinen (brädet t.grid ändras), aeN gubbarnas steg efter lavinen
       var aeS = aeOn ? aeStep(grid, ev.wins, removed) : null;
       var t = aeS ? aeTumble(strips, grid, stops, aeS.gone) : tumble(strips, grid, stops, removed);
       steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });
       if (aeS) {
         var aeSt = steps[steps.length - 1];
-        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.doors = aeS.doors; aeSt.aeN = copyGrid(AE.L); aeSt.aeDepth = AE.stack.length;
+        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.spread = aeSpread(rng, t.grid, aeS.up); aeSt.aeN = copyGrid(AE.L);
       }
       totalX += ev.x * mult;
       grid = t.grid; stops = t.stops;
@@ -3681,7 +3665,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     if (!opts.fs && (opts.ghost !== undefined || opts.goldCheck) && scN >= 4 && TIME.goldP && (scN >= TIME.maniacMin || rng() < TIME.goldP)) {
       for (var gr = 0; gr < REELS; gr++) for (var gy = 0; gy < ROWS; gy++) if (startGrid[gr][gy] === S) gold = { r: gr, y: gy };
     }
-    return { aeL0: aeL0, aeD0: aeD0, gold: gold, startGrid: startGrid, steps: steps, finalGrid: grid, x: totalX, scatters: countScatters(grid), fsMult: fsMult,
+    return { aeL0: aeL0, gold: gold, startGrid: startGrid, steps: steps, finalGrid: grid, x: totalX, scatters: countScatters(grid), fsMult: fsMult,
       ghostIn: opts.ghost || (opts.layers ? opts.layers[0] : null), fsMultIn: opts.fsMult || 1,
       layersIn: opts.layers || null, layersOut: layers ? [grid].concat(layers).slice(0, opts.depth || TIME.maniacDepth || 3) : null,
       // lagren bakåt efter rundan, med de rutor som har använts i vinster borttagna (-1)
@@ -6699,7 +6683,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   // taget (uppifrån vänster), med en studs. wakeT: när vågen börjar (sekunder, samma klocka som render), WAKE_STEP: tiden
   // mellan diagonalerna.
   var wakeT = null, WAKE_STEP = 0.05;
-  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram, och en dörr visar symbolen ur lagret (src/alter-ego.js)
+  // ALTER EGO: en gubbe ritas med sitt stegs bild och sin ram (src/alter-ego.js)
   function drawCell(g, c, x, time, highlight) {
     var aeS = aeSwap(c, x);
     if (aeS) aeTile(g, c, x, highlight, aeS.k);
@@ -13591,7 +13575,6 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       if (amount > 0 && overStake && (!FLOW_RAPP || bigLvl >= 0)) Music.duck(fs ? 'fs' : 'win');
       var tTier = await timeIntro(st, stepX, acc, cls === 0);
       markCells(st.removed);
-      if (st.doors) aeDoors(st.doors);
       state.phase = 'show'; hud();
       showChips(st, amounts);
       var sx = 0, sy = 0, n = 0, keep = timeShow(st);
@@ -13647,8 +13630,9 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       // (lavinen väntar tills symbolerna är insugna i hålen, suck-hole.js)
       await wait(Math.max(showTime(T().popWait * acc * (cls === 0 ? 0.5 : 1)), typeof halVantan === 'function' ? halVantan(FLOW_RAPP ? 0.5 : 0.9) : 0));
       applyMoves(st.moves);
-      if (st.aeN) aeCells(st.aeN, st.aeDepth);
+      if (st.aeN) aeCells(st.aeN);
       await waitFor(function () { return reels.every(function (x) { return x.settled(); }); });
+      if (st.spread && st.spread.length) await aeSpreadShow(st);
       if (fs) {
         // multin växer med summan av lagrens siffror i vinsterna (LAYER 3 = +3)
         var grow = st.wins.reduce(function (a, x) { return a + (x.deep || 0); }, 0);
@@ -13680,16 +13664,16 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   // resume (avbruten omgång): { si: antal frispinn som redan är visade, total: bonusens vinst hittills }
   // ================================================================ ALTER EGO (superbonusen)
   // Förs in i C&T-koden av tools/make-ct-bas.js (före runFreeSpins), så allt i C&T:s spelkod går att använda här.
-  // Gubben är en dörr ner i lagren (prototyp, Pontus 2026-11-11: "Bygg så jag får se vad du menar"; matten i
-  // src/alter-ego-motor.js): Killen, Katten och Växten i en vinst levlar och låses fast, lavinerna bygger LAYER 1–4 bakom
-  // brädet, och en vinst som saknar sin symbol på ett hjul kan gå ner genom en låst gubbe och hämta den i lagren.
+  // Gubbarna levlar, låses och sprider sig (prototyp, Pontus 2026-11-11: "Ersätt dörrarna"; matten i
+  // src/alter-ego-motor.js): Killen, Katten och Växten i en vinst levlar (får ett lager) och låses fast, och när lavinen
+  // har landat sprider de sig till grannrutorna (en granne per steg, ALTER EGO två), så att det blir kluster.
   // Här: gubbarnas bild och ram per steg (c.ae = steget, 2–5 = låst), låsta gubbar som står still när hjulen snurrar,
-  // dörrarna i vinsten, +n till multin, panelen och ALTER EGO-kortet.
+  // spridningen, panelen, ALTER EGO-kortet och ALTER EGO-läget i TEST.
   var AE_SYM = [2, 3, 4], AE_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN'];
   var AE_PIP = '#ff8629', AE_PIP_MAX = '#ffd21f';   // stegen (orange accent) och ALTER EGO (gul)
-  // ramen och lagret i lagrets färg: LAYER 1 blå, 2 grön, 3 röd (UI-basen) och 4 gul (ALTER EGO når alla)
+  // ramen i färgen för gubbens lager: steg 2 = LAYER 1 blå, 3 = LAYER 2 grön, 4 = LAYER 3 röd (UI-basen), 5 = ALTER EGO gul
   var AE_LAYER_FARG = { 1: '#33c9ff', 2: '#3ccf6e', 3: '#ff3b3b', 4: '#ffd21f' };
-  // hur många lager en gubbe på steg k når (samma som aeReach i spelmotorn)
+  // gubbens lager: steg k = LAYER k − 1 (ALTER EGO: 4, gul)
   function aeNar(k) { return k >= 5 ? 4 : Math.max(0, k - 1); }
   // Pontus fem bilder per gubbe (steg 1–5); steg 1 är samma bild som symbolen i grundspelet
   var AE_SRC = {
@@ -13720,8 +13704,8 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     try { aeSprC[key] = makeSprite(s, size); } finally { SYM_IMG[s] = keep; symPaBrade = keepB; }
     return aeSprC[key];
   }
-  // aeLockView: de låsta gubbarna medan hjulen snurrar och landar ({ L: steg per ruta, G: brädet }); aeDjup: antal lager
-  var aeLockView = null, aeDjup = 0;
+  // aeLockView: de låsta gubbarna medan hjulen snurrar och landar ({ L: steg per ruta, G: brädet })
+  var aeLockView = null;
   // rutans steg: c.ae, och medan hjulen landar de låsta gubbarna (rutorna har inte fått c.ae än)
   function aeStegAt(c, x) {
     if (c.ae) return c.ae;
@@ -13752,40 +13736,24 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     rr(g, x + cell * 0.04, y + cell * 0.04, cell * 0.92, cell * 0.92, cell * 0.16); g.fill();
     g.restore();
   }
-  // ramen i färgen för det djupaste lagret gubben når, siffran (hur många lager) och dörren när en vinst går genom den
+  // ramen i lagrets färg och lagrets siffra
   function aeMark(g, c, x, highlight, k) {
     if (c.pop >= 0) return;
     var y = c.y * cell;
     if (y > boardPx || y < -cell) return;
-    aeRam(g, x, y, k, highlight && !c.win && !c.aeDoor ? 0.2 : 1);
-    if (c.aeDoor) aeDorr(g, x, y, c.aeDoor);
+    aeRam(g, x, y, k, highlight && !c.win ? 0.2 : 1);
   }
   function aeRam(g, x, y, k, alpha) {
     var n = aeNar(k), col = AE_LAYER_FARG[n] || AE_PIP;
     g.save(); g.globalAlpha = alpha;
     g.strokeStyle = col; g.lineWidth = Math.max(2, cell * 0.05);
     rr(g, x + cell * 0.05, y + cell * 0.05, cell * 0.9, cell * 0.9, cell * 0.15); g.stroke();
-    // siffran: hur många lager gubben når (ALTER EGO: alla)
+    // siffran: gubbens lager (ALTER EGO: ∞)
     var br = cell * 0.13, bx = x + cell * 0.84, by = y + cell * 0.16;
     g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = Math.max(1.5, cell * 0.025);
     g.beginPath(); g.arc(bx, by, br, 0, Math.PI * 2); g.fill(); g.stroke();
     g.fillStyle = INK; g.font = Math.round(br * 1.5) + 'px ' + DISPLAY; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(k >= 5 ? '∞' : String(n), bx, by + br * 0.08);
-    g.restore();
-  }
-  // dörren: symbolen ur lagret syns i ett hörn av gubben, med LAYER-siffran och vad den ger i multi för vinsten
-  function aeDorr(g, x, y, d) {
-    var col = AE_LAYER_FARG[d.d] || AE_PIP, s = cell * 0.5, sx = x + cell * 0.47, sy = y + cell * 0.47;
-    g.save();
-    g.fillStyle = PAPER; g.strokeStyle = col; g.lineWidth = Math.max(2, cell * 0.05);
-    rr(g, sx, sy, s, s, cell * 0.1); g.fill(); g.stroke();
-    var spr = sprites[d.sym];
-    if (spr) g.drawImage(spr, sx + s * 0.06, sy + s * 0.02, s * 0.88, s * 0.88);
-    var lw = cell * 0.84, lh = cell * 0.18, lx = x + cell * 0.08, ly = y + cell * 0.04;
-    g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = Math.max(1.5, cell * 0.025);
-    rr(g, lx, ly, lw, lh, lh * 0.4); g.fill(); g.stroke();
-    g.fillStyle = INK; g.font = Math.round(lh * 0.78) + 'px ' + DISPLAY; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('LAYER ' + d.d + '  +' + d.d + ' MULTI', lx + lw / 2, ly + lh * 0.56);
     g.restore();
   }
   // medan hjulen snurrar står de låsta gubbarna still ovanpå hjulet (anropas för varje hjul, inom hjulets ruta)
@@ -13799,30 +13767,24 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       aeRam(g, x, py, k, 1);
     }
   }
-  // gubbarnas steg från matten (L) läggs på brädets rutor; depth: antal lager
-  function aeCells(L, depth) {
+  // gubbarnas steg från matten (L) läggs på brädets rutor
+  function aeCells(L) {
     for (var r = 0; r < REELS; r++) for (var y = 0; y < ROWS; y++) {
       var c = reels[r] && reels[r].cells[y];
       if (!c) continue;
-      c.ae = (L[r] && L[r][y]) || 0; c.aeDoor = null;
+      c.ae = (L[r] && L[r][y]) || 0;
     }
-    if (depth != null) aeDjup = depth;
     aePanel();
   }
   // ett nytt frispinn: de låsta gubbarna står kvar medan hjulen snurrar
   function aeSpinStart(res) {
     aeBuild(); aePlace(); aeEl.hidden = false;
-    aeLockView = { L: res.aeL0, G: res.startGrid }; aeDjup = res.aeD0 || 0; aePanel();
+    aeLockView = { L: res.aeL0, G: res.startGrid }; aePanel();
   }
-  function aeLanded(res) { aeCells(res.aeL0, res.aeD0); aeLockView = null; }
-  // vinsten går genom dörrarna: gubben visar symbolen ur lagret medan vinsten visas
-  function aeDoors(doors) {
-    doors.forEach(function (d) { var c = reels[d.r] && reels[d.r].cells[d.y]; if (c) c.aeDoor = { sym: d.sym, d: d.d }; });
-  }
+  function aeLanded(res) { aeCells(res.aeL0); aeLockView = null; }
   // gubbarna i vinsten levlar (de sprängs inte): ny bild och ram, en studs och en ring i lagrets färg; når en gubbe
   // ALTER EGO (steg 5) visas kortet
   async function aeLevel(st) {
-    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.aeDoor = null; }); });
     var top = null;
     st.up.forEach(function (u) {
       var c = reels[u.r] && reels[u.r].cells[u.y];
@@ -13833,6 +13795,18 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     });
     aePanel();
     if (top != null) await aeCard(AE_SYM.indexOf(top), true);
+  }
+  // spridningen när lavinen har landat: grannen blir samma gubbe (studs och ring i gubbens lagerfärg); ett kort ögonblick
+  // så att man ser var klustret växer
+  async function aeSpreadShow(st) {
+    st.spread.forEach(function (q, i) {
+      var c = reels[q.r] && reels[q.r].cells[q.y];
+      if (!c) return;
+      c.sym = q.sym; c.ae = 0; c.tagIn = 0;
+      var src = reels[q.fr] && reels[q.fr].cells[q.fy], col = AE_LAYER_FARG[aeNar(src && src.ae || 2)] || AE_PIP;
+      parts.push({ kind: 'ring', x: q.r * cell + cell / 2, y: q.y * cell + cell / 2, life: 0, max: 0.4, c: col, delay: i * 0.03 });
+    });
+    await wait(showTime(0.45), true);
   }
   function aeCard(i, max) {
     var fx = document.createElement('div'); fx.className = 'ae-fx';
@@ -13856,12 +13830,8 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       '.ae-row.max .ae-step { color: #ffd21f; opacity: 1; }' +
       '.ae-pips { display: flex; gap: 4px; margin-top: 5px; }' +
       '.ae-pips i { width: 17px; height: 8px; border-radius: 3px; background: rgba(255,246,224,.14); border: 1.5px solid #15111f; }' +
-      '.ae-lay { display: flex; gap: 6px; align-items: center; justify-content: center; padding-top: 2px; }' +
-      '.ae-lay b { font-family: var(--display, "Bangers", Impact, sans-serif); font-weight: 400; font-size: 17px; letter-spacing: .05em; margin-right: 4px; }' +
-      '.ae-lay i { width: 26px; height: 14px; border-radius: 4px; background: rgba(255,246,224,.12); border: 1.5px solid #15111f; font-style: normal; font-size: 10px; font-weight: 700; color: #15111f; display: grid; place-items: center; }' +
       '.portrait .ae-panel { position: absolute; left: 0; right: 0; top: calc(100% + 12px); z-index: 5; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 8px; gap: 8px; }' +
       '.portrait .ae-title { display: none; }' +
-      '.portrait .ae-lay { grid-column: 1 / -1; } .portrait .ae-lay b { font-size: 13px; } .portrait .ae-lay i { width: 20px; height: 11px; font-size: 8px; }' +
       '.portrait .ae-row { grid-template-columns: 34px minmax(0, 1fr); gap: 5px; }' +
       '.portrait .ae-row img { width: 34px; height: 34px; }' +
       '.portrait .ae-name { font-size: 13px; } .portrait .ae-step { font-size: 8px; white-space: normal; }' +
@@ -13883,7 +13853,7 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
     aeEl.innerHTML = '<div class="ae-title">ALTER EGO</div>' + AE_SYM.map(function (s, i) {
       return '<div class="ae-row" data-i="' + i + '"><img alt=""><div><div class="ae-name">' + AE_NAMN[i] + '</div><div class="ae-step"></div>' +
         '<div class="ae-pips"><i></i><i></i><i></i><i></i><i></i></div></div></div>';
-    }).join('') + '<div class="ae-lay"><b>LAGER</b><i>1</i><i>2</i><i>3</i><i>4</i></div>';
+    }).join('');
     return aeEl;
   }
   function aePlace() {
@@ -13915,26 +13885,25 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
       row.querySelectorAll('.ae-pips i').forEach(function (p, j) { p.style.background = j < k ? (k >= 5 ? AE_PIP_MAX : AE_PIP) : ''; });
       row.classList.toggle('max', k >= 5);
     }
-    aeEl.querySelectorAll('.ae-lay i').forEach(function (p, j) { p.style.background = j < aeDjup ? AE_LAYER_FARG[j + 1] : ''; });
   }
-  function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeLockView = null; aeDjup = 0; aePanel(); }
+  function aeInit() { aeBuild(); aePlace(); aeEl.hidden = false; aeLockView = null; aePanel(); }
   function aeEnd() {
     if (aeEl) aeEl.hidden = true;
-    aeLockView = null; aeDjup = 0;
+    aeLockView = null;
     // brädet efter bonusen har inga låsta gubbar
-    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; c.aeDoor = null; }); });
+    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.ae = 0; }); });
     document.querySelectorAll('.ae-fx').forEach(function (f) { f.remove(); });
   }
 
   // ---- TEST-menyn, bonusens startkort och reglerna
   function aeNew() {
-    return [['aeMode', 'ALTER EGO-läge (på/av)', 'Varje vanligt snurr spelas som i superbonusen: gubbarna och lagren står kvar mellan snurren. Ingen bonusstart. Tryck igen för att stänga av.'],
-      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar och låses, och vinster kan gå ner i lagren genom dem.']];
+    return [['aeMode', 'ALTER EGO-läge (på/av)', 'Varje vanligt snurr spelas som i superbonusen: de låsta gubbarna står kvar mellan snurren. Ingen bonusstart. Tryck igen för att stänga av.'],
+      ['aeGo', 'ALTER EGO: gratis superbonus', 'Gubbarna levlar, låses och sprider sig till grannarna.']];
   }
   // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
-  // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och gubbarna och lagren står kvar mellan
+  // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och de låsta gubbarna står kvar mellan
   // snurren. Ingen bonusstart, inget startkort, ingen summering och ingen storvinst-ruta. Snurret kostar insatsen som
-  // vanligt (låtsassaldot) och betalar superbonusens vinster. Av och på igen nollställer gubbarna och lagren.
+  // vanligt (låtsassaldot) och betalar superbonusens vinster. Av och på igen nollställer gubbarna.
   var aeTestOn = false;
   function aeTestToggle() {
     aeTestOn = !aeTestOn;
@@ -13947,13 +13916,12 @@ body .bsi-tap2 .tap-go { font-size: 22px; }
   }
   function aeFacts() {
     return '<p><b>Vinst = levla och låsas.</b> Killen, Katten och Växten sprängs inte: de blir nästa gubbe och står kvar (en per hjul).</p>' +
-      '<p>Saknas symbolen på ett hjul går vinsten <b>ner genom en låst gubbe</b> och hämtar den i lagren. <b>LAYER 2 = +2 i MULTI</b> för vinsten</p>';
+      '<p>Varje gång en gubbe levlar <b>sprider den sig</b> till en granne, och <b>ALTER EGO till två</b>. Så växer kluster</p>';
   }
   function aeRule() {
-    return '<li>' + txl('Killen, Katten och Växten i en vinst sprängs inte. De blir nästa gubbe (steg 2–5) och låses fast resten av bonusen, en per hjul (en gubbe till på samma hjul sprängs som vanligt). Nästa snurr landar runt dem, och lavinerna faller förbi dem.') + '</li>' +
-      '<li>' + txl('Varje lavin lägger brädet bakom som ett lager: LAYER 1 är det senaste, upp till LAYER 4.') + '</li>' +
-      '<li>' + txl('Saknas symbolen på ett hjul (från hjul 3) kan vinsten gå ner genom den låsta gubben på hjulet och hämta symbolen i lagren den når: steg 2 når LAYER 1, steg 3 LAYER 1–2, steg 4 LAYER 1–3 och steg 5 (ALTER EGO) alla. Gubben levlar då också.') + '</li>' +
-      '<li>' + txl('En vinst genom LAYER 2 får +2 i multi (x3), genom två dörrar läggs lagren ihop. En vinst räknas bara om den har minst en ny symbol.') + '</li>';
+    return '<li>' + txl('Killen, Katten och Växten i en vinst sprängs inte. De blir nästa gubbe (steg 2–5, ett lager per steg) och låses fast resten av bonusen, en per hjul (en gubbe till på samma hjul sprängs som vanligt). Nästa snurr landar runt dem, och lavinerna faller förbi dem.') + '</li>' +
+      '<li>' + txl('Varje gång en gubbe levlar sprider den sig efter lavinen till en ruta runt om (steg 5, ALTER EGO, till två). Grannen blir samma gubbe, så det blir kluster. Låsta gubbar, BONUS och WILD tas inte över.') + '</li>' +
+      '<li>' + txl('En vinst räknas bara om den har minst en ny symbol (inte bara låsta gubbar).') + '</li>';
   }
 
   async function runFreeSpins(count, bought, maniac, plan, resume) {
