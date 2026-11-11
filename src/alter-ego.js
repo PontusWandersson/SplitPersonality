@@ -56,6 +56,12 @@
   // drawCell ritar en låst gubbe med sitt stegs bild (symbolens bild byts bara medan rutan ritas). Symbolanimationen efter
   // studsen hör till symbolens vanliga bild, så den står över för låsta gubbar.
   function aeSwap(c, x) {
+    if (c.aecLev) {
+      // superbonusens gubbar (c.aecLev = LAYER 1–5): bilden för LAYER n är bild n, ALTER EGO bild 5
+      var oc = { k: c.aecLev, s: c.sym, p: null, a: SYM_ANIM }, sc = AE_IMG[c.sym] && aeSpr(c.sym, c.aecLev);
+      if (sc) { oc.p = sprites[c.sym]; sprites[c.sym] = sc; SYM_ANIM = false; }
+      return oc;
+    }
     var k = aeStegAt(c, x);
     if (k < 2 || !AE_IMG[c.sym]) return null;
     var o = { k: k, s: c.sym, p: sprites[c.sym], a: SYM_ANIM }, spr = aeSpr(c.sym, k);
@@ -81,10 +87,10 @@
     if (c.pop >= 0) return;
     var y = c.y * cell;
     if (y > boardPx || y < -cell) return;
-    aeRam(g, x, y, k, highlight && !c.win ? 0.2 : 1);
+    aeRam(g, x, y, k, highlight && !c.win ? 0.2 : 1, !!c.aecLev);
   }
-  function aeRam(g, x, y, k, alpha) {
-    var n = aeNar(k), col = AE_LAYER_FARG[n] || AE_PIP;
+  function aeRam(g, x, y, k, alpha, direct) {
+    var n = direct ? k : aeNar(k), col = AE_LAYER_FARG[n] || AE_PIP;
     g.save(); g.globalAlpha = alpha;
     g.strokeStyle = col; g.lineWidth = Math.max(2, cell * 0.05);
     rr(g, x + cell * 0.05, y + cell * 0.05, cell * 0.9, cell * 0.9, cell * 0.15); g.stroke();
@@ -301,7 +307,7 @@
 
   // ---- TEST-menyn, bonusens startkort och reglerna
   function aeNew() {
-    return [['aeGo', 'ALTER EGO: gratis superbonus', 'Fyra hörn levlar mot mitten, och i finalen rivs väggen lager för lager.']];
+    return [['aeGo', 'ALTER EGO: gratis superbonus', 'Fyra gubbar i hörnen levlar; när alla är på LAYER 4 släpper spärren till mitten.']];
   }
   // ---- ALTER EGO-läget (TEST-menyn, Pontus 2026-11-11: "så jag inte behöver starta bonusen varje gång"): varje vanligt
   // snurr spelas som ett frispinn i superbonusen (spelmotorns aeTestSpin), och de låsta gubbarna står kvar mellan
@@ -318,53 +324,76 @@
     return { version: M.ENGINE_VERSION, thr: null, base: r, bonus: null, rawX: r.x, x: Math.min(r.x, M.TIME.maxX), capped: r.x >= M.TIME.maxX, wallOut: hist };
   }
   function aeFacts() {
-    return '<p><b>Fyra hörn = LAYER 1–4.</b> Vinner hörnets gubbe levlar hörnet och går in mot mitten (två steg om vinsten är i hörnet). Vinster genom ett hörn får hörnets LAYER i multi.</p>' +
-      '<p>Mitten = <b>LAYER 5, ALTER EGO</b>. Efter sista frispinnet <b>rivs väggen</b>: lika många lager som bästa hörnet nådde, LAYER 1 = x2 … LAYER 5 = x10. Nådde ett hörn mitten kommer sist <b>INFINITY</b>: rutor med tal upp till x1000</p>';
+    return '<p><b>Fyra gubbar i hörnen.</b> Är gubben med i en vinst levlar den (LAYER = multi). Vinster betalar åt båda hållen.</p>' +
+      '<p>Mitten är låst. <b>När alla fyra är på LAYER 4 släpper spärren: ALTER EGO</b>, mitten ger x5. Efter frispinnen <b>rivs väggen</b> (LAYER 1 = x2 … LAYER 5 = x10), sist <b>INFINITY</b> om spärren släppte</p>';
   }
   function aeRule() {
     return '<li>' + txl('Grundspelet: varje snurr har sin egen vägg (LAYER 1–5 bakom brädet), och inget följer med mellan omgångarna. Killen, Katten och Växten i en vinst levlar och låses under lavinerna i snurret, och rutorna runt en låst gubbe kan hämta en saknad symbol ur lagren.') + '</li>' +
-      '<li>' + txl('ALTER EGO, frispinnen: fyra hörn på 3×3 rutor med var sin gubbe (Killen, Katten, Växten och A) börjar på LAYER 1. När hörnets gubbe vinner levlar hörnet ett steg, två om vinsten har en av gubbens rutor inne i hörnet (per lavin), och hörnet flyttar in mot mitten. LAYER 5 är mitten: ALTER EGO.') + '</li>' +
-      '<li>' + txl('En vinst som går genom ett eller flera hörn får det högsta av hörnens LAYER i multi (LAYER 3 = x3).') + '</li>' +
-      '<li>' + txl('Finalen efter sista frispinnet: väggen rivs. Du får lika många lager som det bästa hörnet nådde. Varje lager spelas som ett eget bräde med dubbla sitt nummer i multi (LAYER 1 = x2, LAYER 3 = x6, LAYER 5 = x10), med hörnens gubbar i hörnens mitt. Nådde ett hörn mitten står en WILD i brädets mitt.') + '</li>' +
-      '<li>' + txl('INFINITY: nådde ett hörn mitten kommer ett sista bräde efter LAYER 5. Ungefär var tredje ruta har ett tal (x2, x3, x5, x10, x25, x50, x100, x500 eller x1000). En vinst gångras med summan av talen i sina rutor, och ett tal som har använts försvinner.') + '</li>';
+      '<li>' + txl('ALTER EGO, frispinnen: fyra gubbar (Killen, Katten, Växten och A) sitter fast i var sitt hörn hela bonusen och börjar på LAYER 1. Vinsterna betalar åt båda hållen, från vänster och från höger. En gubbe som är med i en vinst levlar ett steg (högst ett per lavin), upp till LAYER 4.') + '</li>' +
+      '<li>' + txl('En vinst som går genom en eller flera gubbar får det högsta av gubbarnas LAYER i multi (LAYER 3 = x3).') + '</li>' +
+      '<li>' + txl('Spärren: mitten är låst. När alla fyra gubbarna står på LAYER 4 släpper spärren: ALTER EGO. Gubbarna går in i mitten och blir LAYER 5, och vinster som går genom mittens 3×3 rutor får x5 resten av bonusen.') + '</li>' +
+      '<li>' + txl('Finalen efter sista frispinnet: väggen rivs. Släppte spärren får du LAYER 1–5, annars så många lager som den högsta gubben nådde. Varje lager spelas som ett eget bräde med dubbla sitt nummer i multi (LAYER 1 = x2, LAYER 3 = x6, LAYER 5 = x10), med gubbarna på sina rutor och en WILD i mitten när spärren har släppt.') + '</li>' +
+      '<li>' + txl('INFINITY: släppte spärren kommer ett sista bräde efter LAYER 5. Ungefär var åttonde ruta har ett tal (x2, x3, x5, x10, x25, x50, x100, x500 eller x1000). En vinst gångras med summan av talen i sina rutor, och ett tal som har använts försvinner.') + '</li>';
 
   }
 
 
-  // ================================================================ superbonusen: fyra hörn och väggen
-  // Matten i src/alter-ego-motor.js (AEC). Här: hörnen ritas ovanpå brädet (3x3 rutor i lagrets färg med gubben och
-  // LAYER-siffran) och glider in mot mitten när de levlar, vinsterna genom dem blinkar, panelen visar hörnens LAYER och
-  // finalen visar vilket lager som rivs.
+  // ================================================================ superbonusen: gubbarna och spärren
+  // Matten i src/alter-ego-motor.js (AEC). Här: de fyra gubbarna sitter fast i hörnrutorna (c.aecLev = LAYER, bild och ram i
+  // lagrets färg) och står still när hjulen snurrar, mitten är låst med en skylt som visar hur många gubbar som saknas, ett
+  // kort när en gubbe levlar och när spärren släpper (ALTER EGO: gubbarna går in i mitten, mitten ger x5), panelen, och
+  // finalen med lagren och INFINITY.
   var AEC_FARG = AE_LAYER_FARG;   // LAYER 1 blå, 2 grön, 3 röd, 4 lila, 5 gul (ALTER EGO)
   var AEC_NAMN = ['KILLEN', 'KATTEN', 'VÄXTEN', 'A'];
-  // aecView: { lev: hörnens LAYER, from: förra LAYER (glidningen), t0, flash: när hörnet blinkade, final: lagret som rivs }
-  var aecView = null, aecEl = null;
-  function aecPosOf(i, lev) { var q = M.AEC_PATH[i][Math.max(1, Math.min(5, lev)) - 1]; return { c: q[0], r: q[1] }; }
+  // aecView: { lev: gubbarnas LAYER, open: spärren har släppt, flash: när gubben blinkade, final: lagret som rivs, inf,
+  // infHit }; aecSpin: hjulen snurrar (gubbarna ritas fast ovanpå)
+  var aecView = null, aecEl = null, aecSpin = false;
+  function aecPosOf(i) { var q = aecView && aecView.open ? M.AEC_MID[i] : M.AEC_HOME[i]; return { r: q[0], y: q[1] }; }
   function aecSprOf(i, lev) { var sym = M.AEC_SYM[i]; return (AE_IMG[sym] && aeSpr(sym, lev)) || sprites[sym]; }
+  // gubbarnas rutor på brädet får sitt LAYER (bild och ram); allt annat nollställs
+  function aecIconsSet(st) {
+    if (st && st.aecPlace) st.aecPlace.forEach(function (q) { var c = reels[q.r] && reels[q.r].cells[q.y]; if (c) c.sym = q.sym; });
+    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.aecLev = 0; }); });
+    if (!aecView) return;
+    for (var i = 0; i < 4; i++) {
+      var p = aecPosOf(i), c = reels[p.r] && reels[p.r].cells[p.y];
+      if (c && c.sym === M.AEC_SYM[i]) c.aecLev = aecView.lev[i];
+    }
+  }
+  // medan hjulen snurrar står gubbarna still ovanpå sitt hjul
+  function aecDrawLocked(g, r, x) {
+    if (!aecView) return;
+    for (var i = 0; i < 4; i++) {
+      var p = aecPosOf(i);
+      if (p.r !== r) continue;
+      var py = p.y * cell, spr = aecSprOf(i, aecView.lev[i]);
+      aePlatta(g, x, py, 1);
+      if (spr) g.drawImage(spr, x, py, cell, cell);
+      aeRam(g, x, py, aecView.lev[i], 1, true);
+    }
+  }
+  // mitten: låst (en skylt med hur många gubbar som saknar LAYER 4) eller öppen (guld, ALTER EGO x5)
   function aecDraw(g) {
     if (aecView && aecView.final === 6) { aecInfDraw(g); return; }
     if (!aecView || aecView.final) return;
-    var t = aecView.t0 != null ? Math.min(1, (clock - aecView.t0) / 0.5) : 1, e = 1 - Math.pow(1 - t, 3);
-    for (var i = 0; i < 4; i++) {
-      var a = aecPosOf(i, aecView.from[i]), b = aecPosOf(i, aecView.lev[i]);
-      var cx = (a.c + (b.c - a.c) * e) * cell, cy = (a.r + (b.r - a.r) * e) * cell, w = cell * 3;
-      var lv = aecView.lev[i], col = AEC_FARG[lv] || AE_PIP;
-      var fl = aecView.flash[i] != null ? Math.max(0, 1 - (clock - aecView.flash[i]) / 0.9) : 0;
-      g.save();
-      g.globalAlpha = 0.08 + 0.18 * fl; g.fillStyle = col; rr(g, cx + 3, cy + 3, w - 6, w - 6, cell * 0.2); g.fill();
-      g.globalAlpha = 0.9; g.strokeStyle = col; g.lineWidth = Math.max(2, cell * (0.045 + 0.05 * fl));
-      rr(g, cx + 3, cy + 3, w - 6, w - 6, cell * 0.2); g.stroke();
-      // etiketten: gubben och LAYER (multi)
-      var lh = cell * 0.3, lw = cell * 1.6, lx = cx + cell * 0.12, ly = cy + cell * 0.1;
-      g.globalAlpha = 1; g.fillStyle = col; g.strokeStyle = INK; g.lineWidth = Math.max(1.5, cell * 0.025);
-      rr(g, lx, ly, lw, lh, lh * 0.4); g.fill(); g.stroke();
-      var spr = aecSprOf(i, lv); if (spr) g.drawImage(spr, lx - lh * 0.2, ly - lh * 0.35, lh * 1.6, lh * 1.6);
-      g.fillStyle = INK; g.font = Math.round(lh * 0.62) + 'px ' + DISPLAY; g.textAlign = 'left'; g.textBaseline = 'middle';
-      g.fillText(lv >= 5 ? 'ALTER EGO' : 'LAYER ' + lv + '  x' + lv, lx + lh * 1.45, ly + lh * 0.56);
-      g.restore();
-    }
+    var x0 = cell * 2, y0 = cell * 2, w = cell * 3, open = aecView.open;
+    var left = aecView.lev.filter(function (l) { return l < M.AEC_LOCK; }).length;
+    var fl = aecView.openT != null ? Math.max(0, 1 - (clock - aecView.openT) / 1.5) : 0;
+    g.save();
+    g.globalAlpha = open ? 0.14 + 0.3 * fl : 0.06; g.fillStyle = open ? AEC_FARG[5] : PAPER;
+    rr(g, x0 + 3, y0 + 3, w - 6, w - 6, cell * 0.2); g.fill();
+    g.globalAlpha = open ? 0.95 : 0.45; g.strokeStyle = open ? AEC_FARG[5] : PAPER; g.lineWidth = Math.max(2, cell * (open ? 0.06 : 0.035));
+    if (!open) g.setLineDash([cell * 0.12, cell * 0.09]);
+    rr(g, x0 + 3, y0 + 3, w - 6, w - 6, cell * 0.2); g.stroke(); g.setLineDash([]);
+    var txt = open ? 'ALTER EGO  x5' : 'LÅST · ' + left + ' KVAR TILL LAYER ' + M.AEC_LOCK;
+    var lh = cell * 0.28, lw = Math.min(w - cell * 0.2, lh * 0.5 * txt.length + lh), lx = x0 + (w - lw) / 2, ly = y0 + w - lh - cell * 0.08;
+    g.globalAlpha = 1; g.fillStyle = open ? AEC_FARG[5] : INK; g.strokeStyle = open ? INK : PAPER; g.lineWidth = Math.max(1.5, cell * 0.025);
+    rr(g, lx, ly, lw, lh, lh * 0.45); g.fill(); g.stroke();
+    g.fillStyle = open ? INK : PAPER; g.font = Math.round(lh * 0.62) + 'px ' + DISPLAY; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(txt, lx + lw / 2, ly + lh * 0.56);
+    g.restore();
   }
-  // kortet mitt på brädet (hörnet levlar, finalens lager)
+  // kortet mitt på brädet (gubben levlar, spärren släpper, finalens lager)
   function aecCard(top, main, gold, sym, k) {
     var fx = document.createElement('div'); fx.className = 'ae-fx';
     var img = sym != null && AE_SRC[sym] ? '<img alt="" src="' + AE_SRC[sym][Math.max(1, Math.min(5, k)) - 1] + '">' : '';
@@ -372,14 +401,16 @@
     (document.getElementById('frame') || document.body).appendChild(fx);
     return wait(showTime(gold ? 1.5 : 1.0)).then(function () { fx.remove(); });
   }
-  // ett frispinn börjar: hörnens läge, eller finalens lager (ett kort: RIV VÄGGEN! och lagret med sin multi)
+  // ett frispinn börjar: gubbarnas läge, eller finalens lager (kort: RIV VÄGGEN! och lagret med sin multi, eller INFINITY)
   async function aecSpinStart(res) {
     aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
+    if (!aecView) aecView = { lev: res.aeC0.slice(), open: !!res.aeOpen0, flash: [] };
+    aecView.lev = res.aeC0.slice(); aecView.open = !!res.aeOpen0;
+    aecSpin = true;
     if (res.aeFinal) {
-      if (!aecView) aecView = { lev: res.aeC0.slice(), from: res.aeC0.slice(), flash: [] };
       aecView.final = res.aeFinal; aecView.depth = res.aeDepth; aecPanel();
       if (res.aeFinal === 6) {
-        // INFINITY: talen sitter på rutorna (aecView.inf), hit = när ett tal användes i en vinst
+        // INFINITY: talen sitter på rutorna (aecView.inf), infHit = när ett tal användes i en vinst
         aecView.inf = res.aeInfV0.map(function (col) { return col.slice(); }); aecView.infHit = {};
         await aecCard('INFINITY', '∞', true);
         return;
@@ -387,13 +418,13 @@
       await aecCard(res.aeFinal === 1 ? 'RIV VÄGGEN!' : '', 'LAYER ' + res.aeFinal + ' · x' + 2 * res.aeFinal, res.aeFinal >= 5);
       return;
     }
-    aecView = { lev: res.aeC0.slice(), from: res.aeC0.slice(), flash: [], t0: null };
-    aecPanel();
+    aecView.final = 0; aecPanel();
   }
-  // efter ett lavinsteg: hörnen som levlade glider ett steg in, och ett kort visar hörnets nya LAYER
+  function aecLanded() { aecSpin = false; aecIconsSet(null); }
+  // efter ett lavinsteg: gubbarna som levlade blinkar och får ett kort; släpper spärren kommer ALTER EGO-kortet.
+  // INFINITY: talen som vinsten använde försvinner, och kortet visar vinstens största tal.
   async function aecStep(st) {
     if (aecView && aecView.final === 6 && st.aeInfUsed) {
-      // INFINITY: talen som vinsten använde visas en stund och försvinner sedan; kortet visar vinstens största tal
       var best = 1;
       st.wins.forEach(function (w) { if (w.aeInfK > best) best = w.aeInfK; });
       if (best > 1) await aecCard('INFINITY', 'x' + best, true);
@@ -401,21 +432,27 @@
       return;
     }
     if (!aecView || aecView.final || !st.aeC) return;
-    aecView.from = aecView.lev.slice(); aecView.lev = st.aeC.slice(); aecView.t0 = clock;
-    aecPanel();
+    aecView.lev = st.aeC.slice();
     for (var j = 0; j < st.aeCup.length; j++) {
       var i = st.aeCup[j], k = st.aeC[i];
       aecView.flash[i] = clock;
-      await aecCard(AEC_NAMN[i], k >= 5 ? 'ALTER EGO!' : 'LAYER ' + k, k >= 5, M.AEC_SYM[i], k);
+      var p = aecPosOf(i), c = reels[p.r] && reels[p.r].cells[p.y];
+      if (c) { c.aecLev = k; c.tagIn = 0; }
+      if (!st.aeOpened) await aecCard(AEC_NAMN[i], 'LAYER ' + k, false, M.AEC_SYM[i], k);
+    }
+    aecPanel();
+    if (st.aeOpened) {
+      aecView.open = true; aecView.openT = clock; aecPanel();
+      await aecCard('SPÄRREN SLÄPPER', 'ALTER EGO!', true, M.AEC_SYM[0], 5);
     }
   }
-  // vinsten: hörnen som vinsten går genom blinkar (deras LAYER är vinstens multi)
+  // vinsten: gubbarna som vinsten går genom blinkar (det högsta LAYER bland dem är vinstens multi); INFINITY: talen lyser
   function aecWinShow(st) {
     if (aecView && aecView.final === 6 && st.aeInfUsed) { st.aeInfUsed.forEach(function (c) { aecView.infHit[c.r + ',' + c.y] = clock; }); return; }
     if (!aecView || aecView.final) return;
     st.wins.forEach(function (w) { (w.aeTouch || []).forEach(function (i) { aecView.flash[i] = clock; }); });
   }
-  // panelen: hörnens LAYER och finalen
+  // panelen: gubbarnas LAYER, spärren och finalen
   function aecBuild() {
     aeCss();
     if (!document.getElementById('aecCss')) {
@@ -441,19 +478,20 @@
   function aecPanel() {
     if (!aecEl || aecEl.hidden || !aecView) return;
     aecPlace();
-    var rows = aecEl.querySelectorAll('.ae-row'), D = Math.max.apply(null, aecView.lev);
+    var rows = aecEl.querySelectorAll('.ae-row'), left = aecView.lev.filter(function (l) { return l < M.AEC_LOCK; }).length;
     for (var i = 0; i < 4; i++) {
       var lv = aecView.lev[i], sym = M.AEC_SYM[i], row = rows[i], img = row.querySelector('img');
       var src = AE_SRC[sym] ? AE_SRC[sym][lv - 1] : symRawSrc(sym);
       if (src && img.getAttribute('src') !== src) img.setAttribute('src', src);
-      row.querySelector('.ae-step').textContent = lv >= 5 ? 'ALTER EGO · LAYER 5' : 'LAYER ' + lv + ' · x' + lv;
+      row.querySelector('.ae-step').textContent = lv >= 5 ? 'ALTER EGO · LAYER 5' : 'LAYER ' + lv + ' · x' + lv + (lv >= M.AEC_LOCK ? ' · KLAR' : '');
       row.querySelectorAll('.ae-pips i').forEach(function (q, j) { q.style.background = j < lv ? AEC_FARG[j + 1] : ''; });
-      row.classList.toggle('max', lv >= 5);
+      row.classList.toggle('max', lv >= M.AEC_LOCK);
     }
+    var D = aecView.open ? 5 : Math.max.apply(null, aecView.lev);
     aecEl.querySelector('.ae-fin').textContent = aecView.final === 6 ? 'INFINITY' : aecView.final ? 'RIVER LAYER ' + aecView.final + ' AV ' + aecView.depth :
-      'FINALEN: LAYER 1–' + D + (D >= 5 ? ' + INFINITY' : '');
+      aecView.open ? 'SPÄRREN SLÄPPT · FINALEN: LAYER 1–5 + INFINITY' : 'SPÄRREN: ' + left + ' KVAR · FINALEN: LAYER 1–' + D;
   }
-  // INFINITY: talen på rutorna, som guldbrickor nere i hörnet (lyser upp när en vinst använder dem)
+  // INFINITY: talen på rutorna, som brickor nere i hörnet (lyser upp när en vinst använder dem)
   function aecInfDraw(g) {
     var V = aecView.inf;
     if (!V) return;
@@ -472,6 +510,10 @@
   }
   function aecInit() {
     aecBuild(); aecPlace(); aecEl.hidden = false; if (aeEl) aeEl.hidden = true;
-    aecView = { lev: [1, 1, 1, 1], from: [1, 1, 1, 1], flash: [] }; aecPanel();
+    aecView = { lev: [1, 1, 1, 1], open: false, flash: [] }; aecSpin = false; aecPanel();
   }
-  function aecEnd() { aecView = null; if (aecEl) aecEl.hidden = true; document.querySelectorAll('.ae-fx').forEach(function (f) { f.remove(); }); }
+  function aecEnd() {
+    aecView = null; aecSpin = false; if (aecEl) aecEl.hidden = true;
+    reels.forEach(function (rl) { rl.cells.forEach(function (c) { c.aecLev = 0; }); });
+    document.querySelectorAll('.ae-fx').forEach(function (f) { f.remove(); });
+  }

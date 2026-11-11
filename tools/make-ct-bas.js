@@ -129,7 +129,11 @@ rep('<svg viewBox="-3 -3 188 83" aria-hidden="true">', '<svg viewBox="-3 -3 221 
 // Med INFINITY efter LAYER 5 (tal på 12 % av rutorna): 116,7, 121,7 och 110,2 % vid 4,85 (2 500 köp var), alltså cirka
 // 3,98 för 96 %. INFINITY kommer i cirka 29 % av bonusarna och står för 10–28 % av vinsten (svänger mycket: x500 och
 // x1000 är sällsynta); medianen cirka 135x, maxvinsten cirka 1 på 600 köp.
-var CAL = { scale: 0.4489, fsScale: 3.527, maniacScale: 3.98 };
+// Gubbarna och spärren (2026-11-11, scratchpad sim-sparr.js, köpt ALTER EGO): 95,9, 94,6 och 94,8 % vid maniacScale 2,87
+// (2 500 köp var), alltså 2,90. Spärren (alla fyra på LAYER 4) släpper i cirka 12 % av bonusarna (på LAYER 3 skulle den
+// släppa i 34 %), oftast sent (median frispinn 12). Medianen cirka 230x på köpet för 500x, de sämsta 10 % cirka 66x, 20 %
+// under 100x, finalen står för drygt hälften och INFINITY för 5–11 %.
+var CAL = { scale: 0.4489, fsScale: 3.527, maniacScale: 2.9 };
 rep('    1: [1, 1, 1, 1, 1, 2],', '    1: [1, 1, 1, 1, 1, 1, 0],', 'bomberna i grundspelet');
 // HUNT-lägena i köpmenyn: två bomber på hjul 1–6 och ingen på hjul 7, så att Bonusspelet kommer ungefär var 43:e snurr
 // (C&T: var 39:e). Med lagermodellen (2026-11-11, 80 000 snurr, grundspelet räknat om till scale 0,4489): grundspelet
@@ -180,7 +184,8 @@ rep('    var startGrid = grid;\n    for (;;) {',
   '    if (aeOn) { aeOverlay(grid); aeL0 = copyGrid(AE.L); aePeek0 = copyGrid(AE.stack[0]); }\n' +
   '    // superbonusens hörn: aeC0 = hörnens LAYER när brädet landar; finalen: placerade gubbar (opts.place)\n' +
   '    if (opts.place) opts.place.forEach(function (p) { grid[p.r][p.y] = p.sym; });\n' +
-  '    var aecOn = !!(AEC && opts.fs && !opts.aeFinal), aeC0 = aecOn ? AEC.lev.slice() : null;\n' +
+  '    var aecOn = !!(AEC && opts.fs && !opts.aeFinal), aeC0 = aecOn ? AEC.lev.slice() : null, aeOpen0 = aecOn ? AEC.open : false;\n' +
+  '    if (aecOn) aecPlaceIcons(grid);\n' +
   '    var startGrid = grid;\n    for (;;) {', 'ALTER EGO när brädet landar');
 rep('      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }',
   '      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function (wn) { wn.x *= opts.payScale; }); ev.x *= opts.payScale; }\n' +
@@ -188,21 +193,28 @@ rep('      if (opts.payScale && opts.payScale !== 1) { ev.wins.forEach(function 
   '      if (aecOn) aecWins(ev);\n' +
   '      var aeInfUsed = opts.aeInf ? aecInfWins(ev, opts.aeInf) : null;', 'hörnens multi');
 rep('      var ev = layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);',
-  '      var ev = aeOn ? aeEvaluate(grid) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
+  '      var ev = aeOn ? aeEvaluate(grid) : (aecOn || opts.aeFinal) ? aecEvaluate(grid, layers) : layers ? evaluateDeep(grid, layers) : ghost ? evaluateTime(grid, ghost, noTm) : evaluate(grid);', 'ALTER EGO-vinsterna');
 rep("      var t = tumble(strips, grid, stops, removed);\n      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });",
   '      // ALTER EGO: removed är vinstens rutor på brädet (de lyser), gone det som sprängs, up gubbarna som levlar, lused\n' +
   '      // symbolerna ur lagren i vinsterna, aeN gubbarnas steg efter lavinen (steget grid blir nytt LAYER 1)\n' +
   '      var aeS = aeOn ? aeStep(grid, ev.wins, removed) : null;\n' +
-  '      var t = aeS ? aeTumble(strips, grid, stops, aeS.gone) : tumble(strips, grid, stops, removed);\n' +
+  '      var aecFix = aecOn ? aecFixed() : opts.place ? aecFixedFrom(opts.place) : null, aecGoneM = aecFix ? aecGone(removed, aecFix) : null;\n' +
+  '      var t = aeS ? aeTumble(strips, grid, stops, aeS.gone) : aecFix ? aeTumble(strips, grid, stops, aecGoneM, aecFix) : tumble(strips, grid, stops, removed);\n' +
   "      steps.push({ type: 'win', grid: grid, wins: ev.wins, baseX: ev.x, mult: mult, x: ev.x * mult, removed: removed, moves: t.moves, next: t.grid, ghostUsed: ghostUsed });\n" +
   '      if (aeS) {\n' +
   '        var aeSt = steps[steps.length - 1];\n' +
   '        aeSt.gone = aeS.gone; aeSt.up = aeS.up; aeSt.lused = aeS.lused; aeSt.aeN = copyGrid(AE.L); aeSt.aePeek = copyGrid(AE.stack[0]);\n' +
   '      }\n' +
   '      // superbonusens hörn: aeCup = hörnen som levlade, aeC = hörnens LAYER efter steget\n' +
-  '      if (aecOn) { var aecSt = steps[steps.length - 1]; aecSt.aeCup = aecLevel(ev, grid); aecSt.aeC = AEC.lev.slice(); }\n' +
+  '      if (aecGoneM) steps[steps.length - 1].gone = aecGoneM;\n' +
+  '      if (aecOn) {\n' +
+  '        var aecSt = steps[steps.length - 1], aecL = aecLevel(ev);\n' +
+  '        aecSt.aeCup = aecL.up; aecSt.aeC = AEC.lev.slice(); aecSt.aeOpen = AEC.open;\n' +
+  '        // spärren släppte: gubbarna går in i mitten efter lavinen (brädet t.grid ändras)\n' +
+  '        if (aecL.opened) { aecSt.aeOpened = true; aecSt.aecPlace = aecPlaceIcons(t.grid); }\n' +
+  '      }\n' +
   '      if (aeInfUsed) steps[steps.length - 1].aeInfUsed = aeInfUsed;', 'ALTER EGO i lavinen');
-rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
+rep('    return { gold: gold, startGrid: startGrid, steps: steps,', '    return { aeL0: aeL0, aePeek0: aePeek0, aeC0: aeC0, aeOpen0: aeOpen0, gold: gold, startGrid: startGrid, steps: steps,', 'ALTER EGO i rundans resultat');
 // grundspelets snurr (också i HUNT-lägena) med omgångens egen vägg i stället för C&T:s vägg från förra omgången (Stake:
 // inget får följa med mellan omgångar)
 rep('    var base = thr ? throwRound(rng, hist, thr) : playRound(rng, baseOpts({ ghost: hist[0] }));', '    var base = thr ? throwRound(rng, hist, thr) : aeBaseRound(rng);', 'grundspelets snurr');
@@ -210,19 +222,19 @@ rep('      else base = playRound(rng, baseOpts({ ghost: hist[0], strips: strips 
 rep('LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;',
   'LADCAP = INFB ? (TIME.infAt || 6) : depth; LADU = LADX ? Math.max(1, nL) : 99; LADC = 0; var lad0 = LADU;\n' +
   '    // superbonusen: de fyra hörnen börjar på LAYER 1 (gubbarna och lagerzonen från grundspelet gäller inte här)\n' +
-  '    AE = null; AEC = maniac && TIME.alterEgo ? { lev: [1, 1, 1, 1] } : null;', 'ALTER EGO vid bonusstart');
+  '    AE = null; AEC = maniac && TIME.alterEgo ? { lev: [1, 1, 1, 1], open: false } : null;', 'ALTER EGO vid bonusstart');
 rep('var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;',
   '// ALTER EGO-finalen efter sista frispinnet: väggen rivs (aecFinal), lager för lager\n' +
   '    if (AEC) aecFinal(rng, scale, x0, x).forEach(function (fin) { spins.push(fin); x += fin.x; });\n' +
   '    var ladEnd = LADX ? LADU : 0, ladS = LADX ? lad0 : 0; INFB = null; INFV = null; LADU = 99; LADX = 0; LADCAP = 6;\n' +
   '    var aeLevEnd = AEC ? AEC.lev.slice() : null; AE = null; AEC = null;', 'ALTER EGO vid bonusslut');
 rep('return { lad: ladEnd, ladStart: ladS, maniac: maniac,', 'return { lad: ladEnd, ladStart: ladS, aeLev: aeLevEnd, maniac: maniac,', 'hörnen i bonusens resultat');
-rep('    MODES: MODES,\n', '    MODES: MODES, aeTestSpin: aeTestSpin, aeBaseRound: aeBaseRound, AEC_SYM: AEC_SYM, AEC_PATH: AEC_PATH,\n', 'ALTER EGO i CTMath');
+rep('    MODES: MODES,\n', '    MODES: MODES, aeTestSpin: aeTestSpin, aeBaseRound: aeBaseRound, AEC_SYM: AEC_SYM, AEC_HOME: AEC_HOME, AEC_MID: AEC_MID, AEC_LOCK: AEC_LOCK,\n', 'ALTER EGO i CTMath');
 // spelet: gubbarna, lagerzonen och panelen (src/alter-ego.js), inkopplat i grundspelet och bonusflödet
 var AE_JS = fs.readFileSync(path.join(__dirname, '..', 'src', 'alter-ego.js'), 'utf8');
 rep('  async function runFreeSpins(', AE_JS + '  async function runFreeSpins(', 'runFreeSpins');
 rep('    if (!document.body.classList.contains(\'fs\')) fsOn();\n', '    if (!document.body.classList.contains(\'fs\')) fsOn();\n    if (maniac && M.TIME.alterEgo) aecInit();\n', 'hörnen vid bonusstart');
-rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeC0 || res.aeFinal) await aecSpinStart(res);\n      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
+rep('      await spinReels(res, true);\n      // brädet syns en stund innan vinsterna visas', '      if (res.aeC0 || res.aeFinal) await aecSpinStart(res);\n      if (res.aeL0) aeSpinStart(res);\n      await spinReels(res, true);\n      if (res.aeL0) aeLanded(res);\n      if (res.aeC0 || res.aeFinal) aecLanded(res);\n      // brädet syns en stund innan vinsterna visas', 'ALTER EGO per frispinn');
 // finalen: lagren räknas inte som frispinn och ger inga nya frispinn
 rep('      state.fs.left--; renderMeter(); hud(); clearChips();', '      if (!plan.spins[si].aeFinal) state.fs.left--; renderMeter(); hud(); clearChips();', 'finalens lager räknas inte som frispinn');
 rep('      if (res.scatters >= 3) {', '      if (res.scatters >= 3 && !res.aeFinal) {', 'finalen utan nya frispinn');
@@ -247,14 +259,14 @@ rep('  function drawCell(g, c, x, time, highlight) {\n    var y = c.y * cell;',
   '  }\n' +
   '  function drawCell0(g, c, x, time, highlight) {\n    var y = c.y * cell;', 'gubbarna på brädet');
 rep('          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n      } else {',
-  '          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n        if (aeLockView) aeDrawLocked(g, r, x);\n      } else {', 'låsta gubbar under snurret');
+  '          g.drawImage(blur ? blurs[s] : sprites[s], x, sy - cell * (stretch - 1) / 2, cell, cell * stretch);\n        }\n        if (aeLockView) aeDrawLocked(g, r, x);\n        if (aecSpin) aecDrawLocked(g, r, x);\n      } else {', 'låsta gubbar under snurret');
 // de låsta gubbarna ritas sist, så att det som faller förbi dem i lavinen går bakom
 rep('        for (var i = 0; i < reel.cells.length; i++) drawCell(g, reel.cells[i], x, time, highlight);',
   '        for (var i = 0; i < reel.cells.length; i++) if (!(reel.cells[i].ae >= 2)) drawCell(g, reel.cells[i], x, time, highlight);\n' +
   '        for (var i2 = 0; i2 < reel.cells.length; i2++) if (reel.cells[i2].ae >= 2) drawCell(g, reel.cells[i2], x, time, highlight);', 'låsta gubbar överst');
 rep("      markCells(st.removed);\n      state.phase = 'show'; hud();", "      markCells(st.removed);\n      if (st.lused) aeLayerWin(st);\n      if (fs) aecWinShow(st);\n      state.phase = 'show'; hud();", 'lagren i vinsten');
 rep('      popCells(st.removed);\n      if (LAVIN_LJUD) Sound.pop(winIdx);','      popCells(st.gone || st.removed);\n      if (st.up) await aeLevel(st);\n      if (LAVIN_LJUD) Sound.pop(winIdx);', 'gubbarna levlar');
-rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.aeN) aeCells(st.aeN, st.aePeek);\n', 'gubbarna i lavinen');
+rep('      applyMoves(st.moves);\n', '      applyMoves(st.moves);\n      if (st.aeN) aeCells(st.aeN, st.aePeek);\n      if (fs && aecView) aecIconsSet(st);\n', 'gubbarna i lavinen');
 // TEST-menyn, fliken Nytt: ALTER EGO-läget och en gratis superbonus
 rep('  var TESTS = {\n', '  var TESTS = {\n    // ALTER EGO (src/alter-ego.js, aeNew)\n    aeGo: function () { TESTS.maniac(); },\n    aeMode: function () { aeTestToggle(); },\n', 'testknapparna');
 rep('  function nxNew() { return []; }', '  function nxNew() { return aeNew(); }', 'fliken Nytt');
